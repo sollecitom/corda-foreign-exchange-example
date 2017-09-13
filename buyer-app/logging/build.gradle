@@ -1,0 +1,15 @@
+buildscript {
+
+    ext.slf4j_version = '1.7.25'
+    ext.log4j_version = '2.7'
+}
+
+dependencies {
+
+    // Log4J: logging framework (ONLY explicitly referenced by net.corda.core.utilities.Logging.kt)
+    compile "org.apache.logging.log4j:log4j-core:${log4j_version}"
+
+    // SLF4J: commons-logging bindings for a SLF4J back end
+    compile "org.slf4j:jcl-over-slf4j:$slf4j_version"
+    compile "org.slf4j:slf4j-api:$slf4j_version"
+}

@@ -1,0 +1,7 @@
+dependencies {
+    // normally this would only reference the domain sub-project (but we're using packages here not to nest too much)
+    compile project(':buyer-app:domain')
+    compile project(':buyer-app:logging')
+
+    compile"org.springframework:spring-context:$spring_version"
+}

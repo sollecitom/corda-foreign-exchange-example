@@ -1,0 +1,49 @@
+buildscript {
+    ext.spring_boot_version = '1.5.7.RELEASE'
+    ext.ktor_version = '0.4.0'
+    ext.kotson_version = '2.5.0'
+    ext.spring_version = '4.3.11.RELEASE'
+}
+
+repositories {
+    maven {
+        url 'http://dl.bintray.com/kotlin/ktor'
+    }
+    maven {
+        url 'http://dl.bintray.com/kotlin/kotlinx'
+    }
+}
+
+dependencies {
+    // normally this would only reference the domain sub-project (but we're using packages here not to nest too much)
+    compile project(':buyer-app:domain')
+    compile project(':buyer-app:corda-fx-adapter')
+    compile project(':buyer-app:service')
+    compile project(':buyer')
+    compile project(':seller-api')
+
+    compile"org.springframework.boot:spring-boot:$spring_boot_version"
+    compile "org.springframework.boot:spring-boot-autoconfigure:$spring_boot_version"
+    compile"org.springframework.boot:spring-boot-starter-log4j2:$spring_boot_version"
+    compile "org.jetbrains.ktor:ktor-core:$ktor_version"
+    compile "com.github.salomonbrys.kotson:kotson:$kotson_version"
+    // Corda integration dependencies
+    compile ("net.corda:corda-core:$corda_release_version")
+    compile ("net.corda:corda-rpc:$corda_release_version")
+
+    compile ("org.jetbrains.ktor:ktor-netty:$ktor_version") {
+        exclude group: "io.netty", module: "netty-common"
+    }
+
+    compile "net.corda:corda-finance:$corda_release_version"
+    compile "net.corda:corda-jackson:$corda_release_version"
+    runtime "net.corda:corda:$corda_release_version"
+
+    testCompile "net.corda:corda-test-utils:$corda_release_version"
+}
+
+kotlin {
+    experimental {
+        coroutines "enable"
+    }
+}

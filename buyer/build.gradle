@@ -1,0 +1,18 @@
+dependencies {
+
+    cordaCompile project(':shared')
+    cordaCompile project(':buyer-api')
+    cordaCompile project(':rate-provider-api')
+    // Corda integration dependencies
+    cordaCompile "net.corda:corda-core:$corda_release_version"
+    cordaCompile "net.corda:corda-finance:$corda_release_version"
+    cordaCompile "net.corda:corda-jackson:$corda_release_version"
+    cordaCompile "net.corda:corda-rpc:$corda_release_version"
+
+    cordaRuntime "net.corda:corda:$corda_release_version"
+
+    testCompile "net.corda:corda-webserver:$corda_release_version"
+    testRuntime "net.corda:corda-webserver-impl:$corda_release_version"
+
+    testCompile "net.corda:corda-test-utils:$corda_release_version"
+}

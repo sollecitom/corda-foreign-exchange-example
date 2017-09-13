@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <bytecodeTargetLevel>
+      <module name="buyer-api_main" target="1.8" />
+      <module name="buyer-api_test" target="1.8" />
+      <module name="buyer-app_main" target="1.8" />
+      <module name="buyer-app_test" target="1.8" />
+      <module name="buyer_main" target="1.8" />
+      <module name="buyer_test" target="1.8" />
+      <module name="corda-fx-adapter_main" target="1.8" />
+      <module name="corda-fx-adapter_test" target="1.8" />
+      <module name="domain_main" target="1.8" />
+      <module name="domain_test" target="1.8" />
+      <module name="fx-example_main" target="1.8" />
+      <module name="fx-example_test" target="1.8" />
+      <module name="fx-parent_main" target="1.8" />
+      <module name="fx-parent_test" target="1.8" />
+      <module name="logging_main" target="1.8" />
+      <module name="logging_test" target="1.8" />
+      <module name="net.corda.examples.fx-parent_main" target="1.8" />
+      <module name="net.corda.examples.fx-parent_test" target="1.8" />
+      <module name="oracle_main" target="1.8" />
+      <module name="oracle_test" target="1.8" />
+      <module name="rate-provider-api_main" target="1.8" />
+      <module name="rate-provider-api_test" target="1.8" />
+      <module name="rate-provider_main" target="1.8" />
+      <module name="rate-provider_test" target="1.8" />
+      <module name="seller-api_main" target="1.8" />
+      <module name="seller-api_test" target="1.8" />
+      <module name="seller_main" target="1.8" />
+      <module name="seller_test" target="1.8" />
+      <module name="service_main" target="1.8" />
+      <module name="service_test" target="1.8" />
+      <module name="shared_main" target="1.8" />
+      <module name="shared_test" target="1.8" />
+      <module name="web-server-_main" target="1.8" />
+      <module name="web-server-_test" target="1.8" />
+      <module name="web-server-ktor_main" target="1.8" />
+      <module name="web-server-ktor_test" target="1.8" />
+    </bytecodeTargetLevel>
+  </component>
+</project>
