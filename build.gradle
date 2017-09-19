@@ -25,6 +25,9 @@ buildscript {
     }
 }
 
+apply plugin: 'kotlin'
+apply plugin: 'idea'
+
 allprojects {
 
     repositories {
