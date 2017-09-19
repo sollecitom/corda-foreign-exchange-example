@@ -8,5 +8,5 @@ const val HTTP_PORT = "config.http.port"
 
 @Component
 private class ResolvedConfiguration @Autowired private constructor(
-        @Value("\${$HTTP_PORT}") override val httpPort: Int) : Configuration {
+        @Value("\${$HTTP_PORT}") override val httpPort: Int) : ServerConfiguration {
 }

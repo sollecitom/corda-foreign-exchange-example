@@ -1,0 +1,9 @@
+dependencies {
+    compile project(':buyer-app:web-server-common')
+
+    compile("org.springframework.boot:spring-boot-starter-web:$spring_boot_version") {
+        exclude group: "org.springframework.boot", module: "spring-boot-starter-logging"
+    }
+
+    testCompile "net.corda:corda-test-utils:$corda_release_version"
+}

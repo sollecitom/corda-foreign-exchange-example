@@ -8,14 +8,16 @@ Currently based upon Corda M16.
 
 This example illustrates how a foreign currency exchange could be implemented using Corda.
 
-While the functionality is stubbed, the structure shows how to decompose behaviour into different Corda nodes, and how
-to use Oracles as part of Flows.
+While the functionality is not extremely complicated, the structure shows how to decompose behaviour into different Corda nodes, 
+and how to use Oracles as part of Flows.
+
+It also demonstrate how to integrate CORDA into a web application.
 
 This repository is split into four modules:
 
 1. A shared library which holds types that all parties need to use.
 2. A buyer CorDApp, representing an entity that buys foreign currency.
-3. A buyer Spring Boot application talking to the buyer node. It includes a UI. 
+3. A buyer Spring Boot application talking to the buyer node. There are 2 web server implementations: Ktor(buyer_app:web-server-ktor) and Spring-Boot(buyer_app:web-server-spring-boot).
 4. A seller CorDApp, representing an entity that sells foreign currency.
 5. A rate provider CorDApp, representing an entity that provides currency exchange rates as an Oracle.
 
@@ -23,7 +25,7 @@ This repository is split into four modules:
 
 - From terminal inside project root, run `./gradlew deployNodes` and wait for it to finish.
 - From terminal inside project root, run `./build/nodes/runnodes` and wait for it to finish.
-- Run/Debug Starter.kt inside project 'buyer-app:web-server-ktor' from Intellij.
+- Run/Debug Starter.kt inside project 'buyer-app:web-server-ktor' **or** 'buyer-app:web-server-spring-boot' from Intellij.
 
 ## What's available
 

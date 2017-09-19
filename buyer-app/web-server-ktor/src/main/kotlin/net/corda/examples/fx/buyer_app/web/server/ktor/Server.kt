@@ -1,15 +1,12 @@
 package net.corda.examples.fx.buyer_app.web.server.ktor
 
-import com.github.salomonbrys.kotson.double
 import com.github.salomonbrys.kotson.jsonObject
 import com.github.salomonbrys.kotson.string
 import com.google.gson.JsonObject
-import com.google.gson.JsonParser
 import net.corda.core.utilities.loggerFor
-import net.corda.examples.fx.buyer_app.domain.Balance
-import net.corda.examples.fx.buyer_app.domain.MoneyAmount
 import net.corda.examples.fx.buyer_app.service.FXService
-import net.corda.examples.fx.buyer_app.web.server.configuration.Configuration
+import net.corda.examples.fx.buyer_app.web.server.BuyerServer
+import net.corda.examples.fx.buyer_app.web.server.configuration.ServerConfiguration
 import org.jetbrains.ktor.application.ApplicationCall
 import org.jetbrains.ktor.application.install
 import org.jetbrains.ktor.features.Compression
@@ -26,18 +23,15 @@ import org.jetbrains.ktor.routing.route
 import org.jetbrains.ktor.routing.routing
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
-import java.math.BigDecimal
 import java.util.*
 import javax.annotation.PostConstruct
 
 @Component
-private class Server @Autowired internal constructor(private val service: FXService, private val configuration: Configuration) {
+private class Server @Autowired internal constructor(private val service: FXService, private val configuration: ServerConfiguration) : BuyerServer() {
 
     companion object {
         private val logger = loggerFor<Server>()
     }
-
-    private val parser = JsonParser()
 
     @PostConstruct
     internal fun init() {
@@ -77,9 +71,10 @@ private class Server @Autowired internal constructor(private val service: FXServ
         val to = call.request.queryParameters["to"]?.let { Currency.getInstance(it) }
         if (from == null || to == null) {
             call.respondText(text = message("Unspecified 'from' and 'to' currency codes query parameters."), contentType = ContentType.Application.Json, status = HttpStatusCode.BadRequest)
+            return
         }
         try {
-            val rate = service.queryRate(from = from!!, to = to!!)
+            val rate = service.queryRate(from = from, to = to)
             if (rate == null) {
                 call.respondText(text = message("Not exchange rate found."), contentType = ContentType.Application.Json, status = HttpStatusCode.NotFound)
             } else {
@@ -134,30 +129,5 @@ private class Server @Autowired internal constructor(private val service: FXServ
             logger.error("Error while trying to buy money.", e)
             call.respondText(text = message("Unknown error."), contentType = ContentType.Application.Json, status = HttpStatusCode.InternalServerError)
         }
-    }
-
-    private fun fromJson(json: JsonObject): MoneyAmount {
-
-        return MoneyAmount(BigDecimal.valueOf(json["value"].double), Currency.getInstance(json["currency"].string))
-    }
-
-    private fun toJson(amount: MoneyAmount): JsonObject {
-
-        return jsonObject("value" to amount.value.toDouble(), "currency" to amount.currency.currencyCode)
-    }
-
-    private fun toJson(rate: BigDecimal, from: Currency, to: Currency): JsonObject {
-
-        return jsonObject("rate" to rate.toDouble(), "from" to from.currencyCode, "to" to to.currencyCode)
-    }
-
-    private fun toJson(balance: Balance): JsonObject {
-
-        return jsonObject().apply { balance.byCurrency.forEach { (currency, amount) -> addProperty(currency.currencyCode, amount.value.toDouble()) } }
-    }
-
-    private fun message(text: String): String {
-
-        return jsonObject("message" to text).toString()
     }
 }
