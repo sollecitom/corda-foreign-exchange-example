@@ -1,5 +1,6 @@
 package net.corda.examples.fx.buyer_app.domain
 
+import java.math.BigDecimal
 import java.util.*
 
 interface FXAdapter {
@@ -9,4 +10,6 @@ interface FXAdapter {
     fun issueCash(amount: MoneyAmount)
 
     fun balance(): Balance
+
+    fun queryRate(from: Currency, to: Currency): BigDecimal?
 }

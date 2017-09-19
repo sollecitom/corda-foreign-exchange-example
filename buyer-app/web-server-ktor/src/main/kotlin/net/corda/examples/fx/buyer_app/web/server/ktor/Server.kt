@@ -47,9 +47,9 @@ private class Server @Autowired internal constructor(private val service: FXServ
             install(DefaultHeaders)
             install(Compression)
             routing {
-                route("/purchases") {
-                    post("") {
-                        attemptToBuyCash(call)
+                route("/exchangeRate") {
+                    get("") {
+                        readExchangeRate(call)
                     }
                 }
                 route("/cash") {
@@ -60,9 +60,35 @@ private class Server @Autowired internal constructor(private val service: FXServ
                         readCashBalance(call)
                     }
                 }
+                route("/purchases") {
+                    post("") {
+                        attemptToBuyCash(call)
+                    }
+                }
             }
         }
         server.start(wait = true)
+    }
+
+    private suspend fun readExchangeRate(call: ApplicationCall) {
+
+        logger.info("Received read exchange rate request.")
+        val from = call.request.queryParameters["from"]?.let { Currency.getInstance(it) }
+        val to = call.request.queryParameters["to"]?.let { Currency.getInstance(it) }
+        if (from == null || to == null) {
+            call.respondText(text = message("Unspecified 'from' and 'to' currency codes query parameters."), contentType = ContentType.Application.Json, status = HttpStatusCode.BadRequest)
+        }
+        try {
+            val rate = service.queryRate(from = from!!, to = to!!)
+            if (rate == null) {
+                call.respondText(text = message("Not exchange rate found."), contentType = ContentType.Application.Json, status = HttpStatusCode.NotFound)
+            } else {
+                call.respondText(text = toJson(rate, from, to).toString(), contentType = ContentType.Application.Json, status = HttpStatusCode.OK)
+            }
+        } catch (e: Throwable) {
+            logger.error("Error while trying to buy money.", e)
+            call.respondText(text = message("Unknown error."), contentType = ContentType.Application.Json, status = HttpStatusCode.InternalServerError)
+        }
     }
 
     private suspend fun attemptToBuyCash(call: ApplicationCall) {
@@ -120,9 +146,14 @@ private class Server @Autowired internal constructor(private val service: FXServ
         return jsonObject("value" to amount.value.toDouble(), "currency" to amount.currency.currencyCode)
     }
 
+    private fun toJson(rate: BigDecimal, from: Currency, to: Currency): JsonObject {
+
+        return jsonObject("rate" to rate.toDouble(), "from" to from.currencyCode, "to" to to.currencyCode)
+    }
+
     private fun toJson(balance: Balance): JsonObject {
 
-        return jsonObject().apply { balance.byCurrency.forEach {(currency, amount) -> addProperty(currency.currencyCode, amount.value.toDouble())} }
+        return jsonObject().apply { balance.byCurrency.forEach { (currency, amount) -> addProperty(currency.currencyCode, amount.value.toDouble()) } }
     }
 
     private fun message(text: String): String {

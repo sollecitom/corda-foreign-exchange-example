@@ -14,14 +14,8 @@
       <module name="domain_test" target="1.8" />
       <module name="fx-example_main" target="1.8" />
       <module name="fx-example_test" target="1.8" />
-      <module name="fx-parent_main" target="1.8" />
-      <module name="fx-parent_test" target="1.8" />
       <module name="logging_main" target="1.8" />
       <module name="logging_test" target="1.8" />
-      <module name="net.corda.examples.fx-parent_main" target="1.8" />
-      <module name="net.corda.examples.fx-parent_test" target="1.8" />
-      <module name="oracle_main" target="1.8" />
-      <module name="oracle_test" target="1.8" />
       <module name="rate-provider-api_main" target="1.8" />
       <module name="rate-provider-api_test" target="1.8" />
       <module name="rate-provider_main" target="1.8" />
@@ -34,8 +28,6 @@
       <module name="service_test" target="1.8" />
       <module name="shared_main" target="1.8" />
       <module name="shared_test" target="1.8" />
-      <module name="web-server-_main" target="1.8" />
-      <module name="web-server-_test" target="1.8" />
       <module name="web-server-ktor_main" target="1.8" />
       <module name="web-server-ktor_test" target="1.8" />
     </bytecodeTargetLevel>

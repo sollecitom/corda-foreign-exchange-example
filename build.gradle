@@ -135,7 +135,8 @@ task deployNodes(type: Cordform, dependsOn: ['jar']) {
         p2pPort 10005
         rpcPort 10006
         cordapps = ["net.corda.examples.fx:shared:1.0", "net.corda.examples.fx:rate-provider-api:1.0", "net.corda.examples.fx:buyer-api:1.0", "net.corda.examples.fx:buyer:1.0"]
-        rpcUsers = [[user: "user1", "password": "test", "permissions": ["StartFlow.net.corda.examples.fx.buyer.BuyCurrencyFlow", "StartFlow.net.corda.examples.fx.shared.flows.IssueCashFlow"]]]
+        rpcUsers = [[user: "user1", "password": "test", "permissions": ["ALL"]]]
+//        rpcUsers = [[user: "user1", "password": "test", "permissions": ["StartFlow.net.corda.examples.fx.buyer.BuyCurrencyFlow", "StartFlow.net.corda.examples.fx.shared.flows.IssueCashFlow", "StartFlow.net.corda.examples.fx.buyer.ExposeExchangeRateFlow"]]]
     }
     node {
         name "CN=Seller,O=Seller,L=New York,C=US"

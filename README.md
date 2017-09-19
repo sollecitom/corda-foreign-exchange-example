@@ -29,6 +29,17 @@ This repository is split into four modules:
 
 The available endpoints on localhost:8080 are:
 
-- GET /cash -> returns a Map<Currency, Double> with available cash balance. Initially empty.
-- POST /cash e.g., payload {"value": 100.0, "currency": "GBP"} -> issues available cash to the buyer node.
-- POST /purchases e.g., payload {"amount": {"value": 10.0, "currency": "USD"}, "currency": "GBP"} -> buys given amount ($10) from seller node by accepting exchange rate (GBP to USD) from rate-provider.
+- GET /cash -> returns a map currency to available cash balance. Initially empty.
+- GET /exchangeRate?from=<fromCurrencyCode>&to=<toCurrencyCode> e.g., /exchangeRate?from=GBP&to=USD -> returns the exchange rate between specified currencies, or Not Found. Response body is e.g, {"rate": 1.36, "from": "GBP", "to": "USD"}.
+- POST /cash e.g., payload {"value": 1000.0, "currency": "GBP"} -> issues available cash to the buyer node.
+- POST /purchases e.g., payload {"amount": {"value": 100.0, "currency": "USD"}, "currency": "GBP"} -> buys given amount ($10) from seller node by accepting exchange rate (GBP to USD) from rate-provider.
+
+## Example calls
+
+1. GET /cash -> empty (200 OK).
+2. POST /cash with payload {"value": 1000.0, "currency": "GBP"} -> no response body (201 Created).
+3. GET /cash -> {"GBP":1000.0} (200 OK).
+4. GET /exchangeRate?from=GBP&to=USD {"rate":1.36,"from":"GBP","to":"USD"} (200 OK).
+5. POST /purchases with payload {"amount": {"value": 100.0, "currency": "USD"}, "currency": "GBP"} -> no response body (201 Created).
+6. GET /cash -> {"USD":100.0,"GBP":864.0} (200 OK).
+7. As expected the dollars have been bought and the remaining pounds £864 = £1000 - 1.36 (£/$) * $100.

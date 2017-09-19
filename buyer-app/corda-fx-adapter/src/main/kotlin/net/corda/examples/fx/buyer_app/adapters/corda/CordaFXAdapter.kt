@@ -7,6 +7,7 @@ import net.corda.core.getOrThrow
 import net.corda.core.internal.randomOrNull
 import net.corda.core.messaging.startFlow
 import net.corda.examples.fx.buyer.BuyCurrencyFlow
+import net.corda.examples.fx.buyer.ExposeExchangeRateFlow
 import net.corda.examples.fx.buyer_app.domain.Balance
 import net.corda.examples.fx.buyer_app.domain.FXAdapter
 import net.corda.examples.fx.buyer_app.domain.MoneyAmount
@@ -15,6 +16,7 @@ import net.corda.examples.fx.seller.SellerInfo
 import net.corda.examples.fx.shared.flows.IssueCashFlow
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
+import java.math.BigDecimal
 import java.util.*
 
 @Component
@@ -61,6 +63,17 @@ private class CordaFXAdapter @Autowired private constructor(private val configur
             logger.info("Reading cash states from the ledger.")
             val byCurrency = it.proxy.getCashBalances().mapValues { MoneyAmount(it.value.toDecimal(), it.key) }
             return Balance(byCurrency)
+        }
+    }
+
+    override fun queryRate(from: Currency, to: Currency): BigDecimal? {
+
+        logger.info("Connecting to CORDA node at address ${configuration.nodeAddress}")
+        return rpc.start(configuration.user.username, configuration.user.password).use {
+            logger.info("Connected to CORDA node!")
+            logger.info("Reading cash states from the ledger.")
+            val response = it.proxy.startFlow(::ExposeExchangeRateFlow, from, to).returnValue.getOrThrow()
+            response.rate
         }
     }
 }

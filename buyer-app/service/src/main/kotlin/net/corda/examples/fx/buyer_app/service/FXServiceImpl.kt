@@ -6,6 +6,7 @@ import net.corda.examples.fx.buyer_app.domain.MoneyAmount
 import net.corda.examples.fx.buyer_app.logging.loggerFor
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
+import java.math.BigDecimal
 import java.util.*
 
 @Component
@@ -32,5 +33,11 @@ private class FXServiceImpl @Autowired private constructor(private val adapter: 
 
         logger.info("Reading cash balance.")
         return adapter.balance()
+    }
+
+    override fun queryRate(from: Currency, to: Currency): BigDecimal? {
+
+        logger.info("Asking network for ${from.currencyCode} to ${to.currencyCode} exchange rate.")
+        return adapter.queryRate(from, to)
     }
 }
