@@ -5,11 +5,11 @@ buildscript {
 }
 
 dependencies {
-    compile project(':buyer-app:domain')
-    compile project(':buyer-app:corda-fx-adapter')
-    compile project(':buyer-app:service')
-    compile project(':buyer')
-    compile project(':seller-api')
+    cordapp project(':buyer-app:domain')
+    cordapp project(':buyer-app:corda-fx-adapter')
+    cordapp project(':buyer-app:service')
+    cordapp project(':buyer')
+    cordapp project(':seller-api')
 
     compile "org.springframework.boot:spring-boot:$spring_boot_version"
     compile "org.springframework.boot:spring-boot-autoconfigure:$spring_boot_version"

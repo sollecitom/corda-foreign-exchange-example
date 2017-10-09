@@ -1,9 +1,9 @@
 dependencies {
 
-    compile project(':buyer-app:domain')
-    compile project(':buyer-app:logging')
-    compile project(':buyer')
-    compile project(':seller-api')
+    cordapp project(':buyer-app:domain')
+    cordapp project(':buyer-app:logging')
+    cordapp project(':buyer')
+    cordapp project(':seller-api')
 
     compile"org.springframework:spring-context:$spring_version"
     // Corda integration dependencies

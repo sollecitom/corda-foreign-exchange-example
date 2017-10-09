@@ -1,7 +1,7 @@
 dependencies {
-    cordaCompile project(':shared')
-    cordaCompile project(':buyer-api')
-    cordaCompile project(':rate-provider-api')
+    cordapp project(':shared')
+    cordapp project(':buyer-api')
+    cordapp project(':rate-provider-api')
 
     // Corda integration dependencies
     cordaCompile "net.corda:corda-core:$corda_release_version"

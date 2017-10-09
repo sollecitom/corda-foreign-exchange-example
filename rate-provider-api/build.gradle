@@ -1,6 +1,6 @@
 dependencies {
 
-    cordaCompile project(':shared')
+    cordapp project(':shared')
     // Corda integration dependencies
     cordaCompile "net.corda:corda-core:$corda_release_version"
     cordaCompile "net.corda:corda-jackson:$corda_release_version"
