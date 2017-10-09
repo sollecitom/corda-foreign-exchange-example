@@ -15,14 +15,4 @@ dependencies {
     compile "org.springframework.boot:spring-boot-autoconfigure:$spring_boot_version"
     compile "org.springframework.boot:spring-boot-starter-log4j2:$spring_boot_version"
     compile "com.github.salomonbrys.kotson:kotson:$kotson_version"
-
-    // Corda integration dependencies
-    compile("net.corda:corda-core:$corda_release_version")
-    compile("net.corda:corda-rpc:$corda_release_version")
-
-    compile "net.corda:corda-finance:$corda_release_version"
-    compile "net.corda:corda-jackson:$corda_release_version"
-    runtime "net.corda:corda:$corda_release_version"
-
-    testCompile "net.corda:corda-test-utils:$corda_release_version"
 }

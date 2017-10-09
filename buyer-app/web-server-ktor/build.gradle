@@ -13,7 +13,7 @@ repositories {
 }
 
 dependencies {
-    compile project(':buyer-app:web-server-common')
+    cordapp project(':buyer-app:web-server-common')
 
     compile "org.jetbrains.ktor:ktor-core:$ktor_version"
     compile "io.netty:netty-common:$netty_version"

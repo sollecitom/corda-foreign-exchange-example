@@ -8,6 +8,8 @@
       <module name="buyer-app_test" target="1.8" />
       <module name="buyer_main" target="1.8" />
       <module name="buyer_test" target="1.8" />
+      <module name="corda-foreign-exchange-example_main" target="1.8" />
+      <module name="corda-foreign-exchange-example_test" target="1.8" />
       <module name="corda-fx-adapter_main" target="1.8" />
       <module name="corda-fx-adapter_test" target="1.8" />
       <module name="domain_main" target="1.8" />

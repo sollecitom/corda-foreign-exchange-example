@@ -1,19 +1,19 @@
 package net.corda.examples.fx.buyer_app.adapters.corda
 
 import net.corda.client.rpc.CordaRPCClient
+import net.corda.client.rpc.CordaRPCConnection
 import net.corda.core.contracts.Amount
 import net.corda.core.contracts.InsufficientBalanceException
-import net.corda.core.getOrThrow
 import net.corda.core.internal.randomOrNull
 import net.corda.core.messaging.startFlow
-import net.corda.examples.fx.buyer.BuyCurrencyFlow
-import net.corda.examples.fx.buyer.ExposeExchangeRateFlow
+import net.corda.core.node.NodeInfo
+import net.corda.core.utilities.getOrThrow
 import net.corda.examples.fx.buyer_app.domain.Balance
 import net.corda.examples.fx.buyer_app.domain.FXAdapter
 import net.corda.examples.fx.buyer_app.domain.MoneyAmount
 import net.corda.examples.fx.buyer_app.logging.loggerFor
-import net.corda.examples.fx.seller.SellerInfo
 import net.corda.examples.fx.shared.flows.IssueCashFlow
+import net.corda.finance.contracts.getCashBalances
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
@@ -31,18 +31,19 @@ private class CordaFXAdapter @Autowired private constructor(private val configur
     override fun exchangeAmount(amount: MoneyAmount, saleCurrency: Currency): MoneyAmount? {
 
         logger.info("Connecting to CORDA node at address ${configuration.nodeAddress}")
-        return try {
-            rpc.start(configuration.user.username, configuration.user.password).use {
-                logger.info("Connected to CORDA node!")
-                logger.info("Starting flow BuyCurrency")
-                val sellerNode = it.proxy.networkMapFeed().snapshot.filter { it.advertisedServices.any { it.info.type.id == SellerInfo.serviceName } }.randomOrNull() ?: throw Exception("No nodes selling cash found.")
-                it.proxy.startFlow(::BuyCurrencyFlow, amount.toCorda, saleCurrency, sellerNode.legalIdentity).returnValue.getOrThrow()
-                null
-            }
-        } catch (e: InsufficientBalanceException) {
-            logger.info("Insufficient founds to buy $amount.", e)
-            e.amountMissing.toDomain
-        }
+        return null
+//        return try {
+//            rpc.start(configuration.user.username, configuration.user.password).use {
+//                logger.info("Connected to CORDA node!")
+//                logger.info("Starting flow BuyCurrency")
+//                val sellerNode = findSeller(it) ?: throw Exception("No nodes selling cash found.")
+//                it.proxy.startFlow(::BuyCurrencyFlow, amount.toCorda, saleCurrency, sellerNode.legalIdentities.single()).returnValue.getOrThrow()
+//                null
+//            }
+//        } catch (e: InsufficientBalanceException) {
+//            logger.info("Insufficient founds to buy $amount.", e)
+//            e.amountMissing.toDomain
+//        }
     }
 
     override fun issueCash(amount: MoneyAmount) {
@@ -50,8 +51,9 @@ private class CordaFXAdapter @Autowired private constructor(private val configur
         logger.info("Connecting to CORDA node at address ${configuration.nodeAddress}")
         rpc.start(configuration.user.username, configuration.user.password).use {
             logger.info("Connected to CORDA node!")
-            logger.info("Starting flow IssueCashFlow with recipient ${it.proxy.nodeIdentity().legalIdentity}")
-            it.proxy.startFlow(::IssueCashFlow, amount.toCorda, it.proxy.nodeIdentity().legalIdentity).returnValue.getOrThrow()
+            val notary = it.proxy.notaryIdentities().randomOrNull() ?: throw Exception("No notary found.")
+            logger.info("Starting flow IssueCashFlow with notary $notary")
+            it.proxy.startFlow(::IssueCashFlow, amount.toCorda, notary).returnValue.getOrThrow()
         }
     }
 
@@ -69,12 +71,19 @@ private class CordaFXAdapter @Autowired private constructor(private val configur
     override fun queryRate(from: Currency, to: Currency): BigDecimal? {
 
         logger.info("Connecting to CORDA node at address ${configuration.nodeAddress}")
-        return rpc.start(configuration.user.username, configuration.user.password).use {
-            logger.info("Connected to CORDA node!")
-            logger.info("Reading cash states from the ledger.")
-            val response = it.proxy.startFlow(::ExposeExchangeRateFlow, from, to).returnValue.getOrThrow()
-            response.rate
-        }
+        return null
+//        return rpc.start(configuration.user.username, configuration.user.password).use {
+//            logger.info("Connected to CORDA node!")
+//            logger.info("Reading cash states from the ledger.")
+//            val response = it.proxy.startFlow(::ExposeExchangeRateFlow, from, to).returnValue.getOrThrow()
+//            response.rate
+//        }
+    }
+
+    private fun findSeller(it: CordaRPCConnection): NodeInfo? {
+
+        val sellerParty = it.proxy.partiesFromName(configuration.sellerName.toString(), true).toList().randomOrNull() ?: throw Exception("No nodes selling cash found.")
+        return it.proxy.nodeInfoFromParty(sellerParty)
     }
 }
 

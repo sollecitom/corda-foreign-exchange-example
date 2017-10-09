@@ -7,17 +7,16 @@ import net.corda.core.flows.InitiatingFlow
 import net.corda.core.flows.StartableByRPC
 import net.corda.core.identity.Party
 import net.corda.core.utilities.OpaqueBytes
-import net.corda.flows.CashIssueFlow
+import net.corda.finance.flows.CashIssueFlow
 import java.util.*
 
 @InitiatingFlow
 @StartableByRPC
-class IssueCashFlow(private val amount: Amount<Currency>, private val recipient: Party) : FlowLogic<Unit>() {
+class IssueCashFlow(private val amount: Amount<Currency>, private val notary: Party) : FlowLogic<Unit>() {
 
     @Suspendable
     override fun call() {
 
-        val notary = serviceHub.networkMapCache.getAnyNotary()!!
-        subFlow(CashIssueFlow(amount, OpaqueBytes.of(0), recipient, notary, false))
+        subFlow(CashIssueFlow(amount, OpaqueBytes.of(0), notary))
     }
 }
