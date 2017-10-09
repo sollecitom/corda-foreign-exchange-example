@@ -136,7 +136,7 @@ task deployNodes(type: Cordform, dependsOn: ['jar']) {
         advertisedServices = []
         p2pPort 10005
         rpcPort 10006
-        cordapps = ["net.corda.examples.fx:shared:1.0", "net.corda.examples.fx:rate-provider-api:1.0", "net.corda.examples.fx:buyer-api:1.0", "net.corda.examples.fx:buyer:1.0"]
+        cordapps = ["net.corda.examples.fx:shared:1.0", "net.corda.examples.fx:rate-provider-api:1.0", "net.corda.examples.fx:buyer-api:1.0", "net.corda.examples.fx:buyer:1.0", "net.corda:corda-finance:1.0.0"]
         rpcUsers = [[user: "user1", "password": "test", "permissions": ["ALL"]]]
 //        rpcUsers = [[user: "user1", "password": "test", "permissions": ["StartFlow.net.corda.examples.fx.buyer.BuyCurrencyFlow", "StartFlow.net.corda.examples.fx.shared.flows.IssueCashFlow", "StartFlow.net.corda.examples.fx.buyer.ExposeExchangeRateFlow"]]]
     }
@@ -145,7 +145,7 @@ task deployNodes(type: Cordform, dependsOn: ['jar']) {
         advertisedServices = ["net.corda.examples.fx.shared.services.sellCash"]
         p2pPort 10008
         rpcPort 10009
-        cordapps = ["net.corda.examples.fx:shared:1.0", "net.corda.examples.fx:rate-provider-api:1.0", "net.corda.examples.fx:buyer-api:1.0", "net.corda.examples.fx:seller-api:1.0", "net.corda.examples.fx:seller:1.0"]
+        cordapps = ["net.corda.examples.fx:shared:1.0", "net.corda.examples.fx:rate-provider-api:1.0", "net.corda.examples.fx:buyer-api:1.0", "net.corda.examples.fx:seller-api:1.0", "net.corda.examples.fx:seller:1.0", "net.corda:corda-finance:1.0.0"]
         rpcUsers = [[user: "user1", "password": "test", "permissions": []]]
     }
     node {
@@ -153,7 +153,7 @@ task deployNodes(type: Cordform, dependsOn: ['jar']) {
         advertisedServices = ["fx.rate_provider"]
         p2pPort 10011
         rpcPort 10012
-        cordapps = ["net.corda.examples.fx:shared:1.0", "net.corda.examples.fx:rate-provider-api:1.0", "net.corda.examples.fx:rate-provider:1.0"]
+        cordapps = ["net.corda.examples.fx:shared:1.0", "net.corda.examples.fx:rate-provider-api:1.0", "net.corda.examples.fx:rate-provider:1.0", "net.corda:corda-finance:1.0.0"]
         rpcUsers = [[user: "user1", "password": "test", "permissions": []]]
     }
 }
