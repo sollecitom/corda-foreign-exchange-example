@@ -5,6 +5,7 @@ import net.corda.core.contracts.InsufficientBalanceException
 import net.corda.core.flows.FlowLogic
 import net.corda.core.flows.FlowSession
 import net.corda.core.flows.InitiatedBy
+import net.corda.core.flows.SendTransactionFlow
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.internal.ResolveTransactionsFlow
 import net.corda.core.transactions.TransactionBuilder
@@ -39,12 +40,9 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
     @Suspendable
     override fun call() {
 
-        val tx = session.receive<TransactionBuilder>().unwrap {
-            progressTracker.currentStep = STARTING
-            val dependencyTxIDs = it.inputStates().map { it.txhash }.toSet()
-            subFlow(ResolveTransactionsFlow(dependencyTxIDs, session))
-            it
-        }
+        progressTracker.currentStep = STARTING
+
+        val tx = session.receive<TransactionBuilder>().unwrap { it }
 
         val command = tx.commands().single { it.value is ExchangeUsingRate }
         val exchangeRate = command.value as ExchangeUsingRate
@@ -60,17 +58,19 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
         // val notary = serviceHub.networkMapCache.notaryIdentities.randomOrNull()
 
         // Self issuing the amount necessary for the trade - obviously just for the sake of the example.
-        subFlow(IssueCashFlow(exchangeRate.buyAmount, ourIdentity))
+        subFlow(IssueCashFlow(exchangeRate.buyAmount, tx.notary!!))
 
         val (_, anonymisedSpendOwnerKeys) = try {
             Cash.generateSpend(serviceHub, tx, exchangeRate.buyAmount, session.counterparty)
         } catch (e: InsufficientBalanceException) {
             throw CashException("Insufficient cash for spend: ${e.message}", e)
         }
-        tx.addCommand(Cash.Commands.Move(), ourIdentity.owningKey, session.counterparty.owningKey)
+        // TODO check
+//        tx.addCommand(Cash.Commands.Move(), ourIdentity.owningKey, session.counterparty.owningKey)
 
         logger.info("Verifying transaction.")
         progressTracker.currentStep = VERIFYING_TRANSACTION
+        // TODO remove this TODO: fails here!
         tx.verify(serviceHub)
 
         logger.info("Signing transaction.")
@@ -78,7 +78,7 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
         val signedTx = anonymisedSpendOwnerKeys.fold(serviceHub.signInitialTransaction(tx), serviceHub::addSignature)
 
         logger.info("Sending signed transaction to buyer.")
-        session.send(signedTx)
+        subFlow(SendTransactionFlow(session, signedTx))
     }
 
     private fun ExchangeUsingRate.enforceConstraints(signers: List<PublicKey>) {

@@ -39,7 +39,7 @@ class BuyCurrencyFlow(private val buyAmount: Amount<Currency>, private val saleC
         logger.info("Generating spend using exchange rate $exchangeRate.")
 
         val (txBuilder, anonymisedSpendOwnerKeys) = try {
-            Cash.generateSpend(serviceHub, TransactionBuilder(notary = notary), sellAmount, ourIdentity)
+            Cash.generateSpend(serviceHub, TransactionBuilder(notary = notary), sellAmount, seller)
         } catch (e: InsufficientBalanceException) {
             throw CashException("Insufficient cash for spend: ${e.message}", e)
         }
