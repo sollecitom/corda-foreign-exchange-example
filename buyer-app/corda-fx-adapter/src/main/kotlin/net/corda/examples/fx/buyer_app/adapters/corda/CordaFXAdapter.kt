@@ -1,13 +1,11 @@
 package net.corda.examples.fx.buyer_app.adapters.corda
 
 import net.corda.client.rpc.CordaRPCClient
-import net.corda.client.rpc.CordaRPCConnection
 import net.corda.core.contracts.Amount
-import net.corda.core.contracts.InsufficientBalanceException
 import net.corda.core.internal.randomOrNull
 import net.corda.core.messaging.startFlow
-import net.corda.core.node.NodeInfo
 import net.corda.core.utilities.getOrThrow
+import net.corda.examples.fx.buyer.ExposeExchangeRateFlow
 import net.corda.examples.fx.buyer_app.domain.Balance
 import net.corda.examples.fx.buyer_app.domain.FXAdapter
 import net.corda.examples.fx.buyer_app.domain.MoneyAmount
@@ -34,7 +32,7 @@ private class CordaFXAdapter @Autowired private constructor(private val configur
         return null
 //        return try {
 //            rpc.start(configuration.user.username, configuration.user.password).use {
-//                logger.info("Connected to CORDA node!")
+//                logger.info("Connected to CORDA node ${it.proxy.nodeInfo().legalIdentities[0]}!")
 //                logger.info("Starting flow BuyCurrency")
 //                val sellerNode = findSeller(it) ?: throw Exception("No nodes selling cash found.")
 //                it.proxy.startFlow(::BuyCurrencyFlow, amount.toCorda, saleCurrency, sellerNode.legalIdentities.single()).returnValue.getOrThrow()
@@ -50,7 +48,7 @@ private class CordaFXAdapter @Autowired private constructor(private val configur
 
         logger.info("Connecting to CORDA node at address ${configuration.nodeAddress}")
         rpc.start(configuration.user.username, configuration.user.password).use {
-            logger.info("Connected to CORDA node!")
+            logger.info("Connected to CORDA node ${it.proxy.nodeInfo().legalIdentities[0]}!")
             val notary = it.proxy.notaryIdentities().randomOrNull() ?: throw Exception("No notary found.")
             logger.info("Starting flow IssueCashFlow with notary $notary")
             it.proxy.startFlow(::IssueCashFlow, amount.toCorda, notary).returnValue.getOrThrow()
@@ -61,7 +59,7 @@ private class CordaFXAdapter @Autowired private constructor(private val configur
 
         logger.info("Connecting to CORDA node at address ${configuration.nodeAddress}")
         rpc.start(configuration.user.username, configuration.user.password).use {
-            logger.info("Connected to CORDA node!")
+            logger.info("Connected to CORDA node ${it.proxy.nodeInfo().legalIdentities[0]}!")
             logger.info("Reading cash states from the ledger.")
             val byCurrency = it.proxy.getCashBalances().mapValues { MoneyAmount(it.value.toDecimal(), it.key) }
             return Balance(byCurrency)
@@ -71,19 +69,13 @@ private class CordaFXAdapter @Autowired private constructor(private val configur
     override fun queryRate(from: Currency, to: Currency): BigDecimal? {
 
         logger.info("Connecting to CORDA node at address ${configuration.nodeAddress}")
-        return null
-//        return rpc.start(configuration.user.username, configuration.user.password).use {
-//            logger.info("Connected to CORDA node!")
-//            logger.info("Reading cash states from the ledger.")
-//            val response = it.proxy.startFlow(::ExposeExchangeRateFlow, from, to).returnValue.getOrThrow()
-//            response.rate
-//        }
-    }
-
-    private fun findSeller(it: CordaRPCConnection): NodeInfo? {
-
-        val sellerParty = it.proxy.partiesFromName(configuration.sellerName.toString(), true).toList().randomOrNull() ?: throw Exception("No nodes selling cash found.")
-        return it.proxy.nodeInfoFromParty(sellerParty)
+        return rpc.start(configuration.user.username, configuration.user.password).use {
+            logger.info("Connected to CORDA node ${it.proxy.nodeInfo().legalIdentities[0]}!")
+            val rateProvider = it.proxy.wellKnownPartyFromX500Name(configuration.rateProviderName) ?: throw Exception("No exchange rate provider found.")
+            it.proxy.registeredFlows().forEach { println(it) }
+            val response = it.proxy.startFlow(::ExposeExchangeRateFlow, from, to, rateProvider).returnValue.getOrThrow()
+            response.rate
+        }
     }
 }
 

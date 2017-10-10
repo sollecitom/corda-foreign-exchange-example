@@ -1,48 +1,40 @@
-//package net.corda.examples.fx.rate_provider
-//
-//import net.corda.core.contracts.Command
-//import net.corda.core.crypto.DigitalSignature
-//import net.corda.core.crypto.MerkleTreeException
-//import net.corda.core.node.PluginServiceHub
-//import net.corda.core.node.services.CordaService
-//import net.corda.core.node.services.ServiceType
-//import net.corda.core.serialization.SingletonSerializeAsToken
-//import net.corda.core.transactions.FilteredTransaction
-//import net.corda.core.utilities.loggerFor
-//import net.corda.examples.fx.shared.domain.CurrencyValues.DOLLARS
-//import net.corda.examples.fx.shared.domain.CurrencyValues.EUROS
-//import net.corda.examples.fx.shared.domain.CurrencyValues.POUNDS
-//import net.corda.examples.fx.shared.domain.ExchangeRate
-//import net.corda.examples.fx.shared.domain.ExchangeUsingRate
-//import java.math.BigDecimal
-//import java.time.Instant
-//import java.util.*
-//
-//@CordaService
-//class RateProvider(val services: PluginServiceHub) : SingletonSerializeAsToken() {
-//
-//    companion object {
-//        @JvmField
-//        val type = ServiceType.getServiceType("fx", "rate_provider")
-//        private val logger = loggerFor<RateProvider>()
-//    }
-//
-//    private val exchangeRates: List<ExchangeRate> = listOf(
-//            ExchangeRate(DOLLARS, POUNDS, 0.74),
-//            ExchangeRate(DOLLARS, EUROS, 0.84),
-//            ExchangeRate(POUNDS, DOLLARS, 1.36),
-//            ExchangeRate(POUNDS, EUROS, 1.14),
-//            ExchangeRate(EUROS, DOLLARS, 1.20),
-//            ExchangeRate(EUROS, POUNDS, 0.88)
-//    )
-//
-//    fun rateAtTime(from: Currency, to: Currency, timestamp: Instant): BigDecimal? {
-//
-//        val rate = exchangeRates.singleOrNull { it.from == from && it.to == to }?.value
-//        logger.info("Asked to provide $from to $to exchange rate at time $timestamp. Was: $rate.")
-//        return rate
-//    }
-//
+package net.corda.examples.fx.rate_provider
+
+import net.corda.core.node.ServiceHub
+import net.corda.core.node.services.CordaService
+import net.corda.core.serialization.SingletonSerializeAsToken
+import net.corda.core.utilities.loggerFor
+import net.corda.examples.fx.shared.domain.CurrencyValues.DOLLARS
+import net.corda.examples.fx.shared.domain.CurrencyValues.EUROS
+import net.corda.examples.fx.shared.domain.CurrencyValues.POUNDS
+import net.corda.examples.fx.shared.domain.ExchangeRate
+import java.math.BigDecimal
+import java.time.Instant
+import java.util.*
+
+@CordaService
+class RateProvider(private val services: ServiceHub) : SingletonSerializeAsToken() {
+
+    companion object {
+        private val logger = loggerFor<RateProvider>()
+    }
+
+    private val exchangeRates: List<ExchangeRate> = listOf(
+            ExchangeRate(DOLLARS, POUNDS, 0.74),
+            ExchangeRate(DOLLARS, EUROS, 0.84),
+            ExchangeRate(POUNDS, DOLLARS, 1.36),
+            ExchangeRate(POUNDS, EUROS, 1.14),
+            ExchangeRate(EUROS, DOLLARS, 1.20),
+            ExchangeRate(EUROS, POUNDS, 0.88)
+    )
+
+    fun rateAtTime(from: Currency, to: Currency, timestamp: Instant): BigDecimal? {
+
+        val rate = exchangeRates.singleOrNull { it.from == from && it.to == to }?.value
+        logger.info("Asked to provide $from to $to exchange rate at time $timestamp. Was: $rate.")
+        return rate
+    }
+
 //    fun sign(ftx: FilteredTransaction): DigitalSignature.WithKey {
 //
 //        logger.info("Asked to sign transaction.")
@@ -77,4 +69,4 @@
 //        val signature = services.keyManagementService.sign(ftx.rootHash.bytes, services.legalIdentityKey)
 //        return DigitalSignature.WithKey(services.legalIdentityKey, signature.bytes)
 //    }
-//}
+}

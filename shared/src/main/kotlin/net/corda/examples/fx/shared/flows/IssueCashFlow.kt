@@ -10,6 +10,7 @@ import net.corda.core.utilities.OpaqueBytes
 import net.corda.finance.flows.CashIssueFlow
 import java.util.*
 
+// TODO maybe remove this and use CashIssueFlow directly
 @InitiatingFlow
 @StartableByRPC
 class IssueCashFlow(private val amount: Amount<Currency>, private val notary: Party) : FlowLogic<Unit>() {

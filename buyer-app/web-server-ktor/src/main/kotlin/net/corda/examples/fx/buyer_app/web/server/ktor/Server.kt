@@ -81,7 +81,7 @@ private class Server @Autowired internal constructor(private val service: FXServ
                 call.respondText(text = toJson(rate, from, to).toString(), contentType = ContentType.Application.Json, status = HttpStatusCode.OK)
             }
         } catch (e: Throwable) {
-            logger.error("Error while trying to buy money.", e)
+            logger.error("Error while trying to retrieve exchange rate.", e)
             call.respondText(text = message("Unknown error."), contentType = ContentType.Application.Json, status = HttpStatusCode.InternalServerError)
         }
     }
@@ -114,7 +114,7 @@ private class Server @Autowired internal constructor(private val service: FXServ
             service.selfIssueCash(amount)
             call.respondText(text = "", contentType = ContentType.Application.Json, status = HttpStatusCode.Created)
         } catch (e: Throwable) {
-            logger.error("Error while trying to buy money.", e)
+            logger.error("Error while trying to self issue cash.", e)
             call.respondText(text = message("Unknown error."), contentType = ContentType.Application.Json, status = HttpStatusCode.InternalServerError)
         }
     }
@@ -126,7 +126,7 @@ private class Server @Autowired internal constructor(private val service: FXServ
             val balance = service.balance()
             call.respondText(text = toJson(balance).toString(), contentType = ContentType.Application.Json, status = HttpStatusCode.OK)
         } catch (e: Throwable) {
-            logger.error("Error while trying to buy money.", e)
+            logger.error("Error while trying to read balance.", e)
             call.respondText(text = message("Unknown error."), contentType = ContentType.Application.Json, status = HttpStatusCode.InternalServerError)
         }
     }
