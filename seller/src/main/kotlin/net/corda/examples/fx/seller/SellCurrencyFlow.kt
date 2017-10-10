@@ -70,7 +70,7 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
 
         logger.info("Verifying transaction.")
         progressTracker.currentStep = VERIFYING_TRANSACTION
-        // TODO remove this TODO: fails here!
+        // TODO remove this TODO: fails here! Maybe have to split generateSpend to separate txs
         tx.verify(serviceHub)
 
         logger.info("Signing transaction.")
