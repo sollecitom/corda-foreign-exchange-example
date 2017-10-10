@@ -37,7 +37,10 @@ class RateProvider(override val services: ServiceHub) : SingletonSerializeAsToke
         return rate
     }
 
-    private fun validateExchangeRate(command: ExchangeUsingRate) = command.rate.value == rateAtTime(command.rate.from, command.rate.to, command.timestamp)
+    private fun validateExchangeRate(command: ExchangeUsingRate): Boolean {
+
+        return command.rateProviderName == services.myInfo.legalIdentities[0].name && command.rate.value == rateAtTime(command.rate.from, command.rate.to, command.timestamp)
+    }
 
     override val validatingFunctions = setOf(ExchangeUsingRate::class using this::validateExchangeRate)
 

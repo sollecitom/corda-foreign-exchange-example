@@ -45,7 +45,7 @@ class BuyCurrencyFlow(private val buyAmount: Amount<Currency>, private val saleC
         }
 
         val rate = ExchangeRate(saleCurrency, buyAmount.token, exchangeRate)
-        txBuilder.addCommand(ExchangeUsingRate(rate = rate, timestamp = timestamp, buyAmount = buyAmount, sellAmount = sellAmount), rateProvider.owningKey)
+        txBuilder.addCommand(ExchangeUsingRate(rate = rate, timestamp = timestamp, buyAmount = buyAmount, sellAmount = sellAmount, rateProviderName = rateProvider.name), rateProvider.owningKey)
 
         logger.info("Sending signed transaction to seller.")
         val sellerSession = initiateFlow(seller)

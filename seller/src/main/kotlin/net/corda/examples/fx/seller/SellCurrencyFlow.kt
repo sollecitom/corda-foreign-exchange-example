@@ -1,94 +1,100 @@
-//package net.corda.examples.fx.seller
-//
-//import co.paralleluniverse.fibers.Suspendable
-//import net.corda.contracts.asset.Cash
-//import net.corda.core.flows.FlowLogic
-//import net.corda.core.flows.InitiatedBy
-//import net.corda.core.flows.ResolveTransactionsFlow
-//import net.corda.core.identity.Party
-//import net.corda.core.transactions.TransactionBuilder
-//import net.corda.core.utilities.ProgressTracker
-//import net.corda.core.utilities.unwrap
-//import net.corda.examples.fx.buyer.BuyCurrencyFlowDefinition
-//import net.corda.examples.fx.rate_provider.RateProviderInfo
-//import net.corda.examples.fx.shared.domain.ExchangeUsingRate
-//import net.corda.examples.fx.shared.flows.IssueCashFlow
-//import java.math.BigDecimal
-//
-//// TODO use ContractState and Contract to enforce constraints
-//@InitiatedBy(BuyCurrencyFlowDefinition::class)
-//class SellCurrencyFlow(private val buyer: Party) : FlowLogic<Unit>() {
-//
-//    private companion object STEP {
-//
-//        object STARTING : ProgressTracker.Step("STARTING")
-//        object GENERATING_SPEND : ProgressTracker.Step("GENERATING_SPEND")
-//        object VERIFYING_TRANSACTION : ProgressTracker.Step("VERIFYING_TRANSACTION")
-//        object SIGNING_TRANSACTION : ProgressTracker.Step("SIGNING_TRANSACTION")
-//
-//        val VALUES: Array<ProgressTracker.Step> = arrayOf(STARTING, GENERATING_SPEND, VERIFYING_TRANSACTION, SIGNING_TRANSACTION)
-//    }
-//
-//    override val progressTracker = ProgressTracker(*STEP.VALUES)
-//
-//    @Suspendable
-//    override fun call() {
-//
-//        // TODO perform checks!
-//
-//        val rateProviderNode = serviceHub.networkMapCache.getNodesWithService(RateProviderInfo.serviceName).single()
-//
-//        val tx = receive<TransactionBuilder>(buyer).unwrap {
-//
-//            progressTracker.currentStep = STARTING
-//            val dependencyTxIDs = it.inputStates().map { it.txhash }.toSet()
-//            subFlow(ResolveTransactionsFlow(dependencyTxIDs, buyer))
-//            it
-//        }
-//
-//        val commandRaw = tx.commands().single { it.value is ExchangeUsingRate }
-//        require(rateProviderNode.legalIdentity.owningKey in commandRaw.signers) { "Exchange rate was not signed by rate-provider!" }
-//        val command = commandRaw.value as ExchangeUsingRate
-//        command.enforceConstraints()
-//
-//        val sellAmount = command.sellAmount
-//        tx.outputStates().filter { it.data is Cash.State }.map { it.data as Cash.State }.filter { it.owner == serviceHub.myInfo.legalIdentity }.singleOrNull { it.amount.toDecimal() == sellAmount.toDecimal() && it.amount.token.product == sellAmount.token } ?: throw Exception("Missing bought output state of $sellAmount in transaction signed by seller!")
-//
-//        val notary = serviceHub.networkMapCache.getAnyNotary()
-//
-//        // Self issuing the provided amount of money - obviously just for the sake of the example
-//        progressTracker.currentStep = GENERATING_SPEND
-//
-//        subFlow(IssueCashFlow(command.buyAmount, serviceHub.myInfo.legalIdentity))
-//        val (cashBuilder, _) = serviceHub.vaultService.generateSpend(TransactionBuilder(notary = notary), command.buyAmount, buyer)
-//
-//        cashBuilder.inputStates().map { tx.addInputState(serviceHub.toStateAndRef<Cash.State>(it)) }
-//        cashBuilder.outputStates().map { tx.addOutputState(it.data) }
-//
-//        tx.addCommand(Cash.Commands.Move(), serviceHub.myInfo.legalIdentity.owningKey, buyer.owningKey)
-//
-//        logger.info("Verifying transaction.")
-//        progressTracker.currentStep = VERIFYING_TRANSACTION
-//        tx.verify(serviceHub)
-//
-//        logger.info("Signing transaction.")
-//        progressTracker.currentStep = SIGNING_TRANSACTION
-//        val signedTx = serviceHub.signInitialTransaction(tx)
-//
-//        logger.info("Sending signed transaction to buyer.")
-//        send(buyer, signedTx)
-//    }
-//
-//    private fun ExchangeUsingRate.enforceConstraints() {
-//
-//        require(areEqual(buyAmount.toDecimal().multiply(rate.value), sellAmount.toDecimal())) { "Command values do not match!" }
-//        require(buyAmount.token == rate.to) { "Buy amount currency does not match rate from currency!" }
-//        require(sellAmount.token == rate.from) { "Sell amount currency does not match rate to currency!" }
-//    }
-//
-//    private fun areEqual(one: BigDecimal, other: BigDecimal): Boolean {
-//
-//        logger.info("Comparing $one with $other.")
-//        return one.compareTo(other) == 0
-//    }
-//}
+package net.corda.examples.fx.seller
+
+import co.paralleluniverse.fibers.Suspendable
+import net.corda.core.contracts.InsufficientBalanceException
+import net.corda.core.flows.FlowLogic
+import net.corda.core.flows.FlowSession
+import net.corda.core.flows.InitiatedBy
+import net.corda.core.identity.CordaX500Name
+import net.corda.core.internal.ResolveTransactionsFlow
+import net.corda.core.transactions.TransactionBuilder
+import net.corda.core.utilities.ProgressTracker
+import net.corda.core.utilities.unwrap
+import net.corda.examples.fx.buyer.BuyCurrencyFlowDefinition
+import net.corda.examples.fx.shared.domain.ExchangeUsingRate
+import net.corda.examples.fx.shared.flows.IssueCashFlow
+import net.corda.finance.contracts.asset.Cash
+import net.corda.finance.flows.CashException
+import java.math.BigDecimal
+import java.security.PublicKey
+
+// TODO use ContractState and Contract to enforce constraints
+@InitiatedBy(BuyCurrencyFlowDefinition::class)
+class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
+
+    private companion object {
+
+        val RATE_PROVIDERS_WHITELIST = setOf(CordaX500Name(organisation = "Rate-Provider", locality = "Austin", country = "US"))
+
+        val STARTING = object : ProgressTracker.Step("STARTING") {}
+        val GENERATING_SPEND = object : ProgressTracker.Step("GENERATING_SPEND") {}
+        val VERIFYING_TRANSACTION = object : ProgressTracker.Step("VERIFYING_TRANSACTION") {}
+        val SIGNING_TRANSACTION = object : ProgressTracker.Step("SIGNING_TRANSACTION") {}
+
+        val STEPS: Array<ProgressTracker.Step> = arrayOf(STARTING, GENERATING_SPEND, VERIFYING_TRANSACTION, SIGNING_TRANSACTION)
+    }
+
+    override val progressTracker = ProgressTracker(*STEPS)
+
+    @Suspendable
+    override fun call() {
+
+        val tx = session.receive<TransactionBuilder>().unwrap {
+            progressTracker.currentStep = STARTING
+            val dependencyTxIDs = it.inputStates().map { it.txhash }.toSet()
+            subFlow(ResolveTransactionsFlow(dependencyTxIDs, session))
+            it
+        }
+
+        val command = tx.commands().single { it.value is ExchangeUsingRate }
+        val exchangeRate = command.value as ExchangeUsingRate
+        exchangeRate.enforceConstraints(command.signers)
+
+        val sellAmount = exchangeRate.sellAmount
+        tx.outputStates().filter { it.data is Cash.State }.map { it.data as Cash.State }.filter { it.owner == ourIdentity }.singleOrNull { it.amount.toDecimal() == sellAmount.toDecimal() && it.amount.token.product == sellAmount.token } ?: throw Exception("Missing bought output state of $sellAmount in transaction signed by seller!")
+
+        progressTracker.currentStep = GENERATING_SPEND
+
+        // TODO Shall the seller use the same notary specified by the buyer? Any danger?
+        // Not sure how to get a notary without plainly hardcoding it
+        // val notary = serviceHub.networkMapCache.notaryIdentities.randomOrNull()
+
+        // Self issuing the amount necessary for the trade - obviously just for the sake of the example.
+        subFlow(IssueCashFlow(exchangeRate.buyAmount, ourIdentity))
+
+        val (_, anonymisedSpendOwnerKeys) = try {
+            Cash.generateSpend(serviceHub, tx, exchangeRate.buyAmount, session.counterparty)
+        } catch (e: InsufficientBalanceException) {
+            throw CashException("Insufficient cash for spend: ${e.message}", e)
+        }
+        tx.addCommand(Cash.Commands.Move(), ourIdentity.owningKey, session.counterparty.owningKey)
+
+        logger.info("Verifying transaction.")
+        progressTracker.currentStep = VERIFYING_TRANSACTION
+        tx.verify(serviceHub)
+
+        logger.info("Signing transaction.")
+        progressTracker.currentStep = SIGNING_TRANSACTION
+        val signedTx = anonymisedSpendOwnerKeys.fold(serviceHub.signInitialTransaction(tx), serviceHub::addSignature)
+
+        logger.info("Sending signed transaction to buyer.")
+        session.send(signedTx)
+    }
+
+    private fun ExchangeUsingRate.enforceConstraints(signers: List<PublicKey>) {
+
+        require(areEqual(buyAmount.toDecimal().multiply(rate.value), sellAmount.toDecimal())) { "Command values do not match!" }
+        require(buyAmount.token == rate.to) { "Buy amount currency does not match rate from currency!" }
+        require(sellAmount.token == rate.from) { "Sell amount currency does not match rate to currency!" }
+
+        val rateProvider = serviceHub.networkMapCache.getPeerByLegalName(rateProviderName) ?: throw Exception("Cannot find specified rate provider $rateProviderName.")
+        require(rateProvider.owningKey in signers) { "Exchange rate was not signed by rate-provider!" }
+        require(rateProvider.name in RATE_PROVIDERS_WHITELIST) { "Rate provider ${rateProvider.name} is not admissible." }
+    }
+
+    private fun areEqual(one: BigDecimal, other: BigDecimal): Boolean {
+
+        logger.info("Comparing $one with $other.")
+        return one.compareTo(other) == 0
+    }
+}

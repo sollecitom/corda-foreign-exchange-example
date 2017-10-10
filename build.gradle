@@ -112,7 +112,6 @@ dependencies {
     cordapp project(":buyer")
     cordapp project(":buyer-api")
     cordapp project(":seller")
-    cordapp project(":seller-api")
     cordapp project(":rate-provider")
     cordapp project(":rate-provider-api")
 
@@ -145,7 +144,7 @@ task deployNodes(type: Cordform, dependsOn: ['jar']) {
         advertisedServices = ["net.corda.examples.fx.shared.services.sellCash"]
         p2pPort 10008
         rpcPort 10009
-        cordapps = ["net.corda.examples.fx:shared:1.0", "net.corda.examples.fx:rate-provider-api:1.0", "net.corda.examples.fx:buyer-api:1.0", "net.corda.examples.fx:seller-api:1.0", "net.corda.examples.fx:seller:1.0", "net.corda:corda-finance:1.0.0"]
+        cordapps = ["net.corda.examples.fx:shared:1.0", "net.corda.examples.fx:rate-provider-api:1.0", "net.corda.examples.fx:buyer-api:1.0", "net.corda.examples.fx:seller:1.0", "net.corda:corda-finance:1.0.0"]
         rpcUsers = [[user: "user1", "password": "test", "permissions": []]]
     }
     node {

@@ -9,7 +9,6 @@ dependencies {
     cordapp project(':buyer-app:corda-fx-adapter')
     cordapp project(':buyer-app:service')
     cordapp project(':buyer')
-    cordapp project(':seller-api')
 
     compile "org.springframework.boot:spring-boot:$spring_boot_version"
     compile "org.springframework.boot:spring-boot-autoconfigure:$spring_boot_version"
