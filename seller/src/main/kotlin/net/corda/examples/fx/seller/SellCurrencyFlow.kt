@@ -119,7 +119,7 @@ private fun Cash.Companion.generateSpend(builder: TransactionBuilder, serviceHub
 
     val tmpBuilder = TransactionBuilder(builder.notary!!)
     val (_, anonymisedSpendOwnerKeys) = try {
-        generateSpend(serviceHub, tmpBuilder, amount, to)
+        generateSpend(serviceHub, tmpBuilder, amount, to, onlyFromParties)
     } catch (e: InsufficientBalanceException) {
         throw CashException("Insufficient cash for spend: ${e.message}", e)
     }

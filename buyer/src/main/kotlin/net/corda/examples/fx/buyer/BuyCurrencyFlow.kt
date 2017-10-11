@@ -48,21 +48,14 @@ class BuyCurrencyFlow(private val buyAmount: Amount<Currency>, private val saleC
         val sellerSession = initiateFlow(seller)
         subFlow(SendStateAndRefFlow(sellerSession, txBuilder.inputStates().map { serviceHub.toStateAndRef<ContractState>(it) }))
         sellerSession.send(txBuilder)
-        val signedBySeller = subFlow(ReceiveTransactionFlow(sellerSession))
+        val signedBySeller = subFlow(ReceiveTransactionFlow(sellerSession, checkSufficientSignatures = false))
 
         signedBySeller.tx.apply {
             require(outputStates.filterIsInstance<Cash.State>().filter { it.owner == ourIdentity }.singleOrNull { it.amount.toDecimal() == buyAmount.toDecimal() && it.amount.token.product == buyAmount.token } != null) { "Missing bought output state of $buyAmount in transaction signed by seller!" }
             require(commands.any { it.value is Cash.Commands.Move && seller.owningKey in it.signers }) { "Missing move cash command from seller." }
         }
 
-//        val partialMerkleTree = signedBySeller.tx.buildFilteredTransaction(Predicate { filtering(it) })
-//        logger.info("Asking provider to sign rate $rate.")
-//        val rateProviderSignature = subFlow(SignExchangeRateFlow(signedBySeller.tx, partialMerkleTree, rateProvider))
-
-//        val finalTx = anonymisedSpendOwnerKeys.fold(serviceHub.addSignature(signedBySeller).withAdditionalSignature(rateProviderSignature), serviceHub::addSignature)
-        subFlow(FinalityFlow(signedBySeller))
+        val finalTx = anonymisedSpendOwnerKeys.fold(serviceHub.addSignature(signedBySeller), serviceHub::addSignature)
+        subFlow(FinalityFlow(finalTx))
     }
 }
-
-//@Suspendable
-//fun filtering(elem: Any): Boolean = elem is Command<*> && elem.value is ExchangeUsingRate
