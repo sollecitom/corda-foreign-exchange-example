@@ -7,7 +7,6 @@ import net.corda.core.flows.FlowSession
 import net.corda.core.flows.InitiatedBy
 import net.corda.core.flows.SendTransactionFlow
 import net.corda.core.identity.CordaX500Name
-import net.corda.core.internal.ResolveTransactionsFlow
 import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.ProgressTracker
 import net.corda.core.utilities.unwrap
@@ -50,6 +49,7 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
 
         val sellAmount = exchangeRate.sellAmount
         tx.outputStates().filter { it.data is Cash.State }.map { it.data as Cash.State }.filter { it.owner == ourIdentity }.singleOrNull { it.amount.toDecimal() == sellAmount.toDecimal() && it.amount.token.product == sellAmount.token } ?: throw Exception("Missing bought output state of $sellAmount in transaction signed by seller!")
+        // TODO check here for MoveCash command?
 
         progressTracker.currentStep = GENERATING_SPEND
 
@@ -65,12 +65,10 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
         } catch (e: InsufficientBalanceException) {
             throw CashException("Insufficient cash for spend: ${e.message}", e)
         }
-        // TODO check
-//        tx.addCommand(Cash.Commands.Move(), ourIdentity.owningKey, session.counterparty.owningKey)
 
         logger.info("Verifying transaction.")
         progressTracker.currentStep = VERIFYING_TRANSACTION
-        // TODO remove this TODO: fails here! Maybe have to split generateSpend to separate txs
+        // TODO remove this TODO: fails here!
         tx.verify(serviceHub)
 
         logger.info("Signing transaction.")

@@ -35,7 +35,7 @@ private class CordaFXAdapter @Autowired private constructor(private val configur
             rpc.start(configuration.user.username, configuration.user.password).use {
                 logger.info("Connected to CORDA node ${it.proxy.nodeInfo().legalIdentities[0]}!")
                 logger.info("Starting flow BuyCurrency")
-                // TODO get notary from name in configuration
+//              TODO maybe get the notary from the configuration?
                 val notary = it.proxy.notaryIdentities().randomOrNull() ?: throw Exception("No notary found.")
                 val rateProvider = it.proxy.wellKnownPartyFromX500Name(configuration.rateProviderName) ?: throw Exception("No exchange rate provider found.")
                 val sellerNode = it.proxy.wellKnownPartyFromX500Name(configuration.sellerName) ?: throw Exception("No seller nodes found.")
@@ -53,7 +53,7 @@ private class CordaFXAdapter @Autowired private constructor(private val configur
         logger.info("Connecting to CORDA node at address ${configuration.nodeAddress}")
         rpc.start(configuration.user.username, configuration.user.password).use {
             logger.info("Connected to CORDA node ${it.proxy.nodeInfo().legalIdentities[0]}!")
-            // TODO get notary from name in configuration
+//          TODO maybe get the notary from the configuration?
             val notary = it.proxy.notaryIdentities().randomOrNull() ?: throw Exception("No notary found.")
             logger.info("Starting flow IssueCashFlow with notary $notary")
             it.proxy.startFlow(::IssueCashFlow, amount.toCorda, notary).returnValue.getOrThrow()
