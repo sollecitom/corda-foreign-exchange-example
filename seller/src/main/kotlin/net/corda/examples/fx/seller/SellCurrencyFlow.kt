@@ -8,15 +8,20 @@ import net.corda.core.flows.InitiatedBy
 import net.corda.core.flows.SendTransactionFlow
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.transactions.TransactionBuilder
+import net.corda.core.utilities.OpaqueBytes
 import net.corda.core.utilities.ProgressTracker
 import net.corda.core.utilities.unwrap
 import net.corda.examples.fx.buyer.BuyCurrencyFlowDefinition
 import net.corda.examples.fx.shared.domain.ExchangeUsingRate
 import net.corda.examples.fx.shared.flows.IssueCashFlow
 import net.corda.finance.contracts.asset.Cash
+import net.corda.finance.contracts.getCashBalance
+import net.corda.finance.contracts.getCashBalances
 import net.corda.finance.flows.CashException
+import net.corda.finance.flows.CashIssueFlow
 import java.math.BigDecimal
 import java.security.PublicKey
+import java.util.*
 
 // TODO use ContractState and Contract to enforce constraints
 @InitiatedBy(BuyCurrencyFlowDefinition::class)
@@ -60,8 +65,12 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
         // Self issuing the amount necessary for the trade - obviously just for the sake of the example.
         subFlow(IssueCashFlow(exchangeRate.buyAmount, tx.notary!!))
 
+        val balance = serviceHub.getCashBalances()
+        val balanceUSD = serviceHub.getCashBalance(Currency.getInstance("USD"))
+        // TODO this only goes through the second time, even if I proc IssueCashFlow once only!
+        val tx2 = TransactionBuilder(tx.notary!!)
         val (_, anonymisedSpendOwnerKeys) = try {
-            Cash.generateSpend(serviceHub, tx, exchangeRate.buyAmount, session.counterparty)
+            Cash.generateSpend(serviceHub, tx2, exchangeRate.buyAmount, session.counterparty)
         } catch (e: InsufficientBalanceException) {
             throw CashException("Insufficient cash for spend: ${e.message}", e)
         }
