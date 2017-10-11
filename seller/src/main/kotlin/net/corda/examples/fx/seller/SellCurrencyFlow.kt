@@ -1,8 +1,12 @@
 package net.corda.examples.fx.seller
 
 import co.paralleluniverse.fibers.Suspendable
+import net.corda.core.contracts.Command
 import net.corda.core.contracts.ContractState
 import net.corda.core.contracts.InsufficientBalanceException
+import net.corda.core.contracts.StateAndRef
+import net.corda.core.contracts.TransactionState
+import net.corda.core.crypto.SecureHash
 import net.corda.core.flows.FlowLogic
 import net.corda.core.flows.FlowSession
 import net.corda.core.flows.InitiatedBy
@@ -51,8 +55,8 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
         exchangeRate.enforceConstraints(command.signers)
 
         val sellAmount = exchangeRate.sellAmount
-        tx.outputStates().filter { it.data is Cash.State }.map { it.data as Cash.State }.filter { it.owner == ourIdentity }.singleOrNull { it.amount.toDecimal() == sellAmount.toDecimal() && it.amount.token.product == sellAmount.token } ?: throw Exception("Missing bought output state of $sellAmount from buyer!")
-        require(tx.commands().singleOrNull { it.value is Cash.Commands.Move && session.counterparty.owningKey in it.signers } != null) { "Missing move cash command from buyer." }
+        tx.outputStates().filter { it.data is Cash.State }.map { it.data as Cash.State }.filter { it.owner == ourIdentity }.singleOrNull { it.amount.toDecimal() == sellAmount.toDecimal() && it.amount.token.product == sellAmount.token } ?: throw Exception("Missing bought output state of $sellAmount signed from buyer!")
+        require(tx.commands().any { it.value is Cash.Commands.Move && session.counterparty.owningKey in it.signers }) { "Missing move cash command from buyer." }
 
         progressTracker.currentStep = GENERATING_SPEND
 
@@ -64,35 +68,43 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
         subFlow(IssueCashFlow(exchangeRate.buyAmount, tx.notary!!))
 
         // TODO this only goes through the second time, even if I proc IssueCashFlow once only!
+        // TODO move this into an extension function for Cash
         val tx2 = TransactionBuilder(tx.notary!!)
         val (_, anonymisedSpendOwnerKeys) = try {
             Cash.generateSpend(serviceHub, tx2, exchangeRate.buyAmount, session.counterparty)
         } catch (e: InsufficientBalanceException) {
             throw CashException("Insufficient cash for spend: ${e.message}", e)
         }
-        // TODO remove this along with tx2
-        tx2.copyTo(tx)
+        val tx3 = TransactionBuilder(tx.notary!!)
+        tx.copyTo(tx3, filterCommands = { it.value !is Cash.Commands.Move })
+        tx2.copyTo(tx3, filterCommands = { it.value !is Cash.Commands.Move })
+        tx3.addCommand(Cash.Commands.Move(), tx.commands().filter { it.value is Cash.Commands.Move }.flatMap { it.signers } + tx2.commands().filter { it.value is Cash.Commands.Move }.flatMap { it.signers })
 
         logger.info("Verifying transaction.")
         progressTracker.currentStep = VERIFYING_TRANSACTION
         // TODO remove this TODO: fails here!
-        tx.verify(serviceHub)
+        tx3.verify(serviceHub)
 
         logger.info("Signing transaction.")
         progressTracker.currentStep = SIGNING_TRANSACTION
-        val signedTx = anonymisedSpendOwnerKeys.fold(serviceHub.signInitialTransaction(tx), serviceHub::addSignature)
+        val signedTx = anonymisedSpendOwnerKeys.fold(serviceHub.signInitialTransaction(tx3), serviceHub::addSignature)
 
         logger.info("Sending signed transaction to buyer.")
         subFlow(SendTransactionFlow(session, signedTx))
     }
 
     // TODO remove after solving tx2 need - perhaps create a similar function in TransactionBuilder
-    private fun TransactionBuilder.copyTo(other: TransactionBuilder) {
-
-        inputStates().forEach { other.addInputState(serviceHub.toStateAndRef<ContractState>(it)) }
-        outputStates().map { other.addOutputState(it) }
-        commands().forEach { other.addCommand(it) }
-        attachments().forEach { other.addAttachment(it) }
+    private fun TransactionBuilder.copyTo(
+            other: TransactionBuilder,
+            filterInputStates: (input: StateAndRef<ContractState>) -> Boolean = { true },
+            filterOutputStates: (output: TransactionState<ContractState>) -> Boolean = { true },
+            filterCommands: (command: Command<*>) -> Boolean = { true },
+            filterAttachments: (attachment: SecureHash) -> Boolean = { true }
+    ) {
+        inputStates().map { serviceHub.toStateAndRef<ContractState>(it) }.filter(filterInputStates).forEach { other.addInputState(it) }
+        outputStates().filter(filterOutputStates).map { other.addOutputState(it) }
+        commands().filter(filterCommands).forEach { other.addCommand(it) }
+        attachments().filter(filterAttachments).forEach { other.addAttachment(it) }
     }
 
     private fun ExchangeUsingRate.enforceConstraints(signers: List<PublicKey>) {

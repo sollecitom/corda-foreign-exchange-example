@@ -55,8 +55,8 @@ class BuyCurrencyFlow(private val buyAmount: Amount<Currency>, private val saleC
         val signedBySeller = sellerSession.sendAndReceive<SignedTransaction>(txBuilder).unwrap { it }
 
         signedBySeller.tx.apply {
-            require(commands.singleOrNull { it.value is Cash.Commands.Move && seller.owningKey in it.signers } != null) { "Missing move cash command from seller." }
             require(outputStates.filterIsInstance<Cash.State>().filter { it.owner == ourIdentity }.singleOrNull { it.amount.toDecimal() == buyAmount.toDecimal() && it.amount.token.product == buyAmount.token } != null) { "Missing bought output state of $buyAmount in transaction signed by seller!" }
+            require(commands.any { it.value is Cash.Commands.Move && seller.owningKey in it.signers }) { "Missing move cash command from seller." }
         }
 
         val dependencyTxIDs = signedBySeller.tx.inputs.map { it.txhash }.toSet()
