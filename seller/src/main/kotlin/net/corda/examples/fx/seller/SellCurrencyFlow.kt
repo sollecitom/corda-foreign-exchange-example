@@ -1,6 +1,7 @@
 package net.corda.examples.fx.seller
 
 import co.paralleluniverse.fibers.Suspendable
+import net.corda.core.contracts.Amount
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.ContractState
 import net.corda.core.contracts.InsufficientBalanceException
@@ -12,7 +13,9 @@ import net.corda.core.flows.FlowSession
 import net.corda.core.flows.InitiatedBy
 import net.corda.core.flows.ReceiveStateAndRefFlow
 import net.corda.core.flows.SendTransactionFlow
+import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.CordaX500Name
+import net.corda.core.node.ServiceHub
 import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.ProgressTracker
 import net.corda.core.utilities.unwrap
@@ -23,6 +26,7 @@ import net.corda.finance.contracts.asset.Cash
 import net.corda.finance.flows.CashException
 import java.math.BigDecimal
 import java.security.PublicKey
+import java.util.*
 
 // TODO use ContractState and Contract to enforce constraints
 @InitiatedBy(BuyCurrencyFlowDefinition::class)
@@ -48,15 +52,15 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
         progressTracker.currentStep = STARTING
 
         subFlow(ReceiveStateAndRefFlow<ContractState>(session))
-        val tx = session.receive<TransactionBuilder>().unwrap { it }
+        val buyerTx = session.receive<TransactionBuilder>().unwrap { it }
 
-        val command = tx.commands().single { it.value is ExchangeUsingRate }
+        val command = buyerTx.commands().single { it.value is ExchangeUsingRate }
         val exchangeRate = command.value as ExchangeUsingRate
         exchangeRate.enforceConstraints(command.signers)
 
         val sellAmount = exchangeRate.sellAmount
-        tx.outputStates().filter { it.data is Cash.State }.map { it.data as Cash.State }.filter { it.owner == ourIdentity }.singleOrNull { it.amount.toDecimal() == sellAmount.toDecimal() && it.amount.token.product == sellAmount.token } ?: throw Exception("Missing bought output state of $sellAmount signed from buyer!")
-        require(tx.commands().any { it.value is Cash.Commands.Move && session.counterparty.owningKey in it.signers }) { "Missing move cash command from buyer." }
+        buyerTx.outputStates().filter { it.data is Cash.State }.map { it.data as Cash.State }.filter { it.owner == ourIdentity }.singleOrNull { it.amount.toDecimal() == sellAmount.toDecimal() && it.amount.token.product == sellAmount.token } ?: throw Exception("Missing bought output state of $sellAmount signed from buyer!")
+        require(buyerTx.commands().any { it.value is Cash.Commands.Move && session.counterparty.owningKey in it.signers }) { "Missing move cash command from buyer." }
 
         progressTracker.currentStep = GENERATING_SPEND
 
@@ -65,46 +69,25 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
         // val notary = serviceHub.networkMapCache.notaryIdentities.randomOrNull()
 
         // Self issuing the amount necessary for the trade - obviously just for the sake of the example.
-        subFlow(IssueCashFlow(exchangeRate.buyAmount, tx.notary!!))
+        subFlow(IssueCashFlow(exchangeRate.buyAmount, buyerTx.notary!!))
 
-        // TODO this only goes through the second time, even if I proc IssueCashFlow once only!
-        // TODO move this into an extension function for Cash
-        val tx2 = TransactionBuilder(tx.notary!!)
-        val (_, anonymisedSpendOwnerKeys) = try {
-            Cash.generateSpend(serviceHub, tx2, exchangeRate.buyAmount, session.counterparty)
+        val (tx, anonymisedSpendOwnerKeys) = try {
+            Cash.generateSpend(buyerTx, serviceHub, exchangeRate.buyAmount, session.counterparty)
         } catch (e: InsufficientBalanceException) {
             throw CashException("Insufficient cash for spend: ${e.message}", e)
         }
-        val tx3 = TransactionBuilder(tx.notary!!)
-        tx.copyTo(tx3, filterCommands = { it.value !is Cash.Commands.Move })
-        tx2.copyTo(tx3, filterCommands = { it.value !is Cash.Commands.Move })
-        tx3.addCommand(Cash.Commands.Move(), tx.commands().filter { it.value is Cash.Commands.Move }.flatMap { it.signers } + tx2.commands().filter { it.value is Cash.Commands.Move }.flatMap { it.signers })
 
         logger.info("Verifying transaction.")
         progressTracker.currentStep = VERIFYING_TRANSACTION
         // TODO remove this TODO: fails here!
-        tx3.verify(serviceHub)
+        tx.verify(serviceHub)
 
         logger.info("Signing transaction.")
         progressTracker.currentStep = SIGNING_TRANSACTION
-        val signedTx = anonymisedSpendOwnerKeys.fold(serviceHub.signInitialTransaction(tx3), serviceHub::addSignature)
+        val signedTx = anonymisedSpendOwnerKeys.fold(serviceHub.signInitialTransaction(tx), serviceHub::addSignature)
 
         logger.info("Sending signed transaction to buyer.")
         subFlow(SendTransactionFlow(session, signedTx))
-    }
-
-    // TODO remove after solving tx2 need - perhaps create a similar function in TransactionBuilder
-    private fun TransactionBuilder.copyTo(
-            other: TransactionBuilder,
-            filterInputStates: (input: StateAndRef<ContractState>) -> Boolean = { true },
-            filterOutputStates: (output: TransactionState<ContractState>) -> Boolean = { true },
-            filterCommands: (command: Command<*>) -> Boolean = { true },
-            filterAttachments: (attachment: SecureHash) -> Boolean = { true }
-    ) {
-        inputStates().map { serviceHub.toStateAndRef<ContractState>(it) }.filter(filterInputStates).forEach { other.addInputState(it) }
-        outputStates().filter(filterOutputStates).map { other.addOutputState(it) }
-        commands().filter(filterCommands).forEach { other.addCommand(it) }
-        attachments().filter(filterAttachments).forEach { other.addAttachment(it) }
     }
 
     private fun ExchangeUsingRate.enforceConstraints(signers: List<PublicKey>) {
@@ -123,4 +106,34 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
         logger.info("Comparing $one with $other.")
         return one.compareTo(other) == 0
     }
+}
+
+private fun Cash.Companion.generateSpend(builder: TransactionBuilder, serviceHub: ServiceHub, amount: Amount<Currency>, to: AbstractParty, onlyFromParties: Set<AbstractParty> = emptySet()): Pair<TransactionBuilder, List<PublicKey>> {
+
+    val tmpBuilder = TransactionBuilder(builder.notary!!)
+    val (_, anonymisedSpendOwnerKeys) = try {
+        generateSpend(serviceHub, tmpBuilder, amount, to)
+    } catch (e: InsufficientBalanceException) {
+        throw CashException("Insufficient cash for spend: ${e.message}", e)
+    }
+    val resultBuilder = TransactionBuilder(builder.notary!!)
+    builder.copyTo(resultBuilder, serviceHub, filterCommands = { it.value !is Cash.Commands.Move })
+    tmpBuilder.copyTo(resultBuilder, serviceHub, filterCommands = { it.value !is Cash.Commands.Move })
+    resultBuilder.addCommand(Cash.Commands.Move(), builder.commands().filter { it.value is Cash.Commands.Move }.flatMap { it.signers } + tmpBuilder.commands().filter { it.value is Cash.Commands.Move }.flatMap { it.signers })
+    return resultBuilder to anonymisedSpendOwnerKeys
+}
+
+// TODO remove after solving tmpBuilder need - or perhaps create a similar function in TransactionBuilder
+private fun TransactionBuilder.copyTo(
+        other: TransactionBuilder,
+        serviceHub: ServiceHub,
+        filterInputStates: (input: StateAndRef<ContractState>) -> Boolean = { true },
+        filterOutputStates: (output: TransactionState<ContractState>) -> Boolean = { true },
+        filterCommands: (command: Command<*>) -> Boolean = { true },
+        filterAttachments: (attachment: SecureHash) -> Boolean = { true }
+) {
+    inputStates().map { serviceHub.toStateAndRef<ContractState>(it) }.filter(filterInputStates).forEach { other.addInputState(it) }
+    outputStates().filter(filterOutputStates).map { other.addOutputState(it) }
+    commands().filter(filterCommands).forEach { other.addCommand(it) }
+    attachments().filter(filterAttachments).forEach { other.addAttachment(it) }
 }

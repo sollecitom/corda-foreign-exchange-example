@@ -59,9 +59,6 @@ class BuyCurrencyFlow(private val buyAmount: Amount<Currency>, private val saleC
             require(commands.any { it.value is Cash.Commands.Move && seller.owningKey in it.signers }) { "Missing move cash command from seller." }
         }
 
-        val dependencyTxIDs = signedBySeller.tx.inputs.map { it.txhash }.toSet()
-        subFlow(ResolveTransactionsFlow(dependencyTxIDs, sellerSession))
-
         val partialMerkleTree = signedBySeller.tx.buildFilteredTransaction(Predicate { filtering(it) })
         logger.info("Asking provider to sign rate $rate.")
         val rateProviderSignature = subFlow(SignExchangeRateFlow(signedBySeller.tx, partialMerkleTree, rateProvider))
