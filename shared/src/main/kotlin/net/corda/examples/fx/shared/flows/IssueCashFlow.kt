@@ -7,17 +7,18 @@ import net.corda.core.flows.InitiatingFlow
 import net.corda.core.flows.StartableByRPC
 import net.corda.core.identity.Party
 import net.corda.core.utilities.OpaqueBytes
+import net.corda.finance.flows.AbstractCashFlow
 import net.corda.finance.flows.CashIssueFlow
 import java.util.*
 
 // TODO maybe remove this and use CashIssueFlow directly
 @InitiatingFlow
 @StartableByRPC
-class IssueCashFlow(private val amount: Amount<Currency>, private val notary: Party) : FlowLogic<Unit>() {
+class IssueCashFlow(private val amount: Amount<Currency>, private val notary: Party) : FlowLogic<AbstractCashFlow.Result>() {
 
     @Suspendable
-    override fun call() {
+    override fun call(): AbstractCashFlow.Result {
 
-        subFlow(CashIssueFlow(amount, OpaqueBytes.of(0), notary))
+        return subFlow(CashIssueFlow(amount, OpaqueBytes.of(0), notary))
     }
 }

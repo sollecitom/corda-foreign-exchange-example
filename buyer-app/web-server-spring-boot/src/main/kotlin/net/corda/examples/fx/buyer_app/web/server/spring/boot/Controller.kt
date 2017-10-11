@@ -54,7 +54,7 @@ private class CustomerController @Autowired constructor(private val service: FXS
             val balance = service.balance()
             ResponseEntity.ok(toJson(balance).toString())
         } catch (e: Throwable) {
-            logger.error("Error while trying to buy money.", e)
+            logger.error("Error while trying to read balance.", e)
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(message("Unknown error."))
         }
     }
@@ -91,7 +91,7 @@ private class CustomerController @Autowired constructor(private val service: FXS
                 ResponseEntity.unprocessableEntity().body(jsonObject("message" to "Insufficient funds to buy given money amount. Missing ${result.missingAmount}.", "missing" to toJson(result.missingAmount!!)).toString())
             }
         } catch (e: Throwable) {
-            logger.error("Error while trying to read balance.", e)
+            logger.error("Error while trying to buy money.", e)
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(message("Unknown error."))
         }
     }

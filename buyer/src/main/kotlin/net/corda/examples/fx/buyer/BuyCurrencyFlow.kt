@@ -3,8 +3,10 @@ package net.corda.examples.fx.buyer
 import co.paralleluniverse.fibers.Suspendable
 import net.corda.core.contracts.Amount
 import net.corda.core.contracts.Command
+import net.corda.core.contracts.ContractState
 import net.corda.core.contracts.InsufficientBalanceException
 import net.corda.core.flows.FinalityFlow
+import net.corda.core.flows.SendStateAndRefFlow
 import net.corda.core.flows.StartableByRPC
 import net.corda.core.identity.Party
 import net.corda.core.internal.ResolveTransactionsFlow
@@ -49,10 +51,11 @@ class BuyCurrencyFlow(private val buyAmount: Amount<Currency>, private val saleC
 
         logger.info("Sending signed transaction to seller.")
         val sellerSession = initiateFlow(seller)
+        subFlow(SendStateAndRefFlow(sellerSession, txBuilder.inputStates().map { serviceHub.toStateAndRef<ContractState>(it) }))
         val signedBySeller = sellerSession.sendAndReceive<SignedTransaction>(txBuilder).unwrap { it }
 
         signedBySeller.tx.apply {
-            require(commands.singleOrNull { it.value is Cash.Commands.Move } != null) { "Missing move cash command from seller." }
+            require(commands.singleOrNull { it.value is Cash.Commands.Move && seller.owningKey in it.signers } != null) { "Missing move cash command from seller." }
             require(outputStates.filterIsInstance<Cash.State>().filter { it.owner == ourIdentity }.singleOrNull { it.amount.toDecimal() == buyAmount.toDecimal() && it.amount.token.product == buyAmount.token } != null) { "Missing bought output state of $buyAmount in transaction signed by seller!" }
         }
 
