@@ -15,11 +15,13 @@ import net.corda.core.flows.ReceiveStateAndRefFlow
 import net.corda.core.flows.SendTransactionFlow
 import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.CordaX500Name
+import net.corda.core.identity.Party
 import net.corda.core.node.ServiceHub
 import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.ProgressTracker
 import net.corda.core.utilities.unwrap
 import net.corda.examples.fx.buyer.BuyCurrencyFlowDefinition
+import net.corda.examples.fx.rate_provider.SignExchangeRateFlow
 import net.corda.examples.fx.shared.domain.ExchangeUsingRate
 import net.corda.examples.fx.shared.flows.IssueCashFlow
 import net.corda.finance.contracts.asset.Cash
@@ -27,6 +29,7 @@ import net.corda.finance.flows.CashException
 import java.math.BigDecimal
 import java.security.PublicKey
 import java.util.*
+import java.util.function.Predicate
 
 @InitiatedBy(BuyCurrencyFlowDefinition::class)
 class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
@@ -55,17 +58,16 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
 
         val command = buyerTx.commands().single { it.value is ExchangeUsingRate }
         val exchangeRate = command.value as ExchangeUsingRate
-        exchangeRate.enforceConstraints(command.signers)
+
+        val rateProvider = serviceHub.networkMapCache.getPeerByLegalName(exchangeRate.rateProviderName) ?: throw Exception("Cannot find specified rate provider ${exchangeRate.rateProviderName}.")
+
+        exchangeRate.enforceConstraints(rateProvider, command.signers)
 
         val sellAmount = exchangeRate.sellAmount
         buyerTx.outputStates().filter { it.data is Cash.State }.map { it.data as Cash.State }.filter { it.owner == ourIdentity }.singleOrNull { it.amount.toDecimal() == sellAmount.toDecimal() && it.amount.token.product == sellAmount.token } ?: throw Exception("Missing bought output state of $sellAmount signed from buyer!")
         require(buyerTx.commands().any { it.value is Cash.Commands.Move && session.counterparty.owningKey in it.signers }) { "Missing move cash command from buyer." }
 
         progressTracker.currentStep = GENERATING_SPEND
-
-        // TODO Shall the seller use the same notary specified by the buyer? Any danger?
-        // Not sure how to get a notary without plainly hardcoding it
-        // val notary = serviceHub.networkMapCache.notaryIdentities.randomOrNull()
 
         // Self issuing the amount necessary for the trade - obviously just for the sake of the example.
         subFlow(IssueCashFlow(exchangeRate.buyAmount, buyerTx.notary!!))
@@ -78,24 +80,28 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
 
         logger.info("Verifying transaction.")
         progressTracker.currentStep = VERIFYING_TRANSACTION
-        // TODO remove this TODO: fails here!
         tx.verify(serviceHub)
 
         logger.info("Signing transaction.")
         progressTracker.currentStep = SIGNING_TRANSACTION
         val signedTx = anonymisedSpendOwnerKeys.fold(serviceHub.signInitialTransaction(tx), serviceHub::addSignature)
 
-        logger.info("Sending signed transaction to buyer.")
-        subFlow(SendTransactionFlow(session, signedTx))
+        val partialMerkleTree = signedTx.tx.buildFilteredTransaction(Predicate { filtering(it) })
+        logger.info("Asking provider to sign rate ${exchangeRate.rate}.")
+        val rateProviderSignature = subFlow(SignExchangeRateFlow(signedTx.tx, partialMerkleTree, rateProvider))
+
+        val finalTx = anonymisedSpendOwnerKeys.fold(serviceHub.addSignature(signedTx).withAdditionalSignature(rateProviderSignature), serviceHub::addSignature)
+
+        logger.info("Sending final signed transaction to buyer.")
+        subFlow(SendTransactionFlow(session, finalTx))
     }
 
-    private fun ExchangeUsingRate.enforceConstraints(signers: List<PublicKey>) {
+    private fun ExchangeUsingRate.enforceConstraints(rateProvider: Party, signers: List<PublicKey>) {
 
         require(areEqual(buyAmount.toDecimal().multiply(rate.value), sellAmount.toDecimal())) { "Command values do not match!" }
         require(buyAmount.token == rate.to) { "Buy amount currency does not match rate from currency!" }
         require(sellAmount.token == rate.from) { "Sell amount currency does not match rate to currency!" }
 
-        val rateProvider = serviceHub.networkMapCache.getPeerByLegalName(rateProviderName) ?: throw Exception("Cannot find specified rate provider $rateProviderName.")
         require(rateProvider.owningKey in signers) { "Exchange rate was not signed by rate-provider!" }
         require(rateProvider.name in RATE_PROVIDERS_WHITELIST) { "Rate provider ${rateProvider.name} is not admissible." }
     }
@@ -139,3 +145,6 @@ private fun TransactionBuilder.copyTo(
     commands().filter(filterCommands).forEach { other.addCommand(it) }
     attachments().filter(filterAttachments).forEach { other.addAttachment(it) }
 }
+
+@Suspendable
+fun filtering(elem: Any): Boolean = elem is Command<*> && elem.value is ExchangeUsingRate
