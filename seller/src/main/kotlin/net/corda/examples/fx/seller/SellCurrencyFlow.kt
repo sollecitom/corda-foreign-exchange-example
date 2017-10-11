@@ -28,7 +28,6 @@ import java.math.BigDecimal
 import java.security.PublicKey
 import java.util.*
 
-// TODO use ContractState and Contract to enforce constraints
 @InitiatedBy(BuyCurrencyFlowDefinition::class)
 class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
 
@@ -108,6 +107,8 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
     }
 }
 
+// TODO I believe this should be the standard behaviour of Cash.generateSpend(), rather than appending a Cash.Commands.Move() without checks
+// TODO port this to Corda
 private fun Cash.Companion.generateSpend(builder: TransactionBuilder, serviceHub: ServiceHub, amount: Amount<Currency>, to: AbstractParty, onlyFromParties: Set<AbstractParty> = emptySet()): Pair<TransactionBuilder, List<PublicKey>> {
 
     val tmpBuilder = TransactionBuilder(builder.notary!!)
@@ -123,7 +124,7 @@ private fun Cash.Companion.generateSpend(builder: TransactionBuilder, serviceHub
     return resultBuilder to anonymisedSpendOwnerKeys
 }
 
-// TODO remove after solving tmpBuilder need - or perhaps create a similar function in TransactionBuilder
+// TODO remove after solving tmpBuilder need - or perhaps port this into Corda's TransactionBuilder
 private fun TransactionBuilder.copyTo(
         other: TransactionBuilder,
         serviceHub: ServiceHub,
@@ -132,6 +133,7 @@ private fun TransactionBuilder.copyTo(
         filterCommands: (command: Command<*>) -> Boolean = { true },
         filterAttachments: (attachment: SecureHash) -> Boolean = { true }
 ) {
+    // TODO perhaps we won't need this if we add this function to TransactionBuilder
     inputStates().map { serviceHub.toStateAndRef<ContractState>(it) }.filter(filterInputStates).forEach { other.addInputState(it) }
     outputStates().filter(filterOutputStates).map { other.addOutputState(it) }
     commands().filter(filterCommands).forEach { other.addCommand(it) }
