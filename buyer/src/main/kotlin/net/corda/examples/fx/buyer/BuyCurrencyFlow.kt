@@ -15,6 +15,7 @@ import net.corda.core.utilities.ProgressTracker
 import net.corda.examples.fx.rate_provider.QueryExchangeRateFlow
 import net.corda.examples.fx.shared.domain.ExchangeRate
 import net.corda.examples.fx.shared.domain.ExchangeUsingRate
+import net.corda.examples.fx.shared.flows.IdentitySyncForBuilderFlow
 import net.corda.finance.contracts.asset.Cash
 import net.corda.finance.flows.CashException
 import java.time.Instant
@@ -52,7 +53,7 @@ class BuyCurrencyFlow(private val buyAmount: Amount<Currency>, private val saleC
         subFlow(SendStateAndRefFlow(sellerSession, txBuilder.inputStates().map { serviceHub.toStateAndRef<ContractState>(it) }))
         sellerSession.send(txBuilder)
         // TODO maybe refactor to be automatic
-        subFlow(FxIdentitySyncFlow.Send(sellerSession, txBuilder))
+        subFlow(IdentitySyncForBuilderFlow.Send(sellerSession, txBuilder))
 
         // TODO maybe refactor to be automatic
         subFlow(IdentitySyncFlow.Receive(sellerSession))

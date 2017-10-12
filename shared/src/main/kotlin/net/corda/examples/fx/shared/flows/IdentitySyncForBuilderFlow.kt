@@ -1,4 +1,4 @@
-package net.corda.examples.fx.buyer
+package net.corda.examples.fx.shared.flows
 
 import co.paralleluniverse.fibers.Suspendable
 import net.corda.core.contracts.ContractState
@@ -10,7 +10,7 @@ import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.ProgressTracker
 import net.corda.core.utilities.unwrap
 
-object FxIdentitySyncFlow {
+object IdentitySyncForBuilderFlow {
 
     class Send(private val otherSide: FlowSession, private val tx: TransactionBuilder, override val progressTracker: ProgressTracker = tracker()) : FlowLogic<Unit>() {
 
