@@ -126,11 +126,9 @@ task deployNodes(type: Cordform, dependsOn: ['jar']) {
     node {
         name "O=R3cev,OU=corda,L=London,C=GB"
         advertisedServices = ["corda.notary.simple"]
-//        advertisedServices = ["corda.notary.validating"]
         p2pPort 10002
         rpcPort 10003
-        cordapps = ["net.corda.examples.fx:shared:1.0", "net.corda:corda-finance:1.0.0"]
-//        cordapps = ["net.corda.examples.fx:shared:1.0"]
+        cordapps = ["net.corda.examples.fx:shared:1.0"]
     }
     node {
         name "O=Buyer,L=London,C=GB"
