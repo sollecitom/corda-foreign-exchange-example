@@ -128,6 +128,7 @@ task deployNodes(type: Cordform, dependsOn: ['jar']) {
         advertisedServices = ["corda.notary.simple"]
         p2pPort 10002
         rpcPort 10003
+        // TODO try to remove this
         cordapps = ["net.corda.examples.fx:shared:1.0"]
     }
     node {

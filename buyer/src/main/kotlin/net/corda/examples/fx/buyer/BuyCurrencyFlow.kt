@@ -1,13 +1,8 @@
 package net.corda.examples.fx.buyer
 
 import co.paralleluniverse.fibers.Suspendable
-import net.corda.confidential.IdentitySyncFlow
 import net.corda.core.contracts.Amount
-import net.corda.core.contracts.ContractState
-import net.corda.core.contracts.InsufficientBalanceException
 import net.corda.core.flows.FinalityFlow
-import net.corda.core.flows.ReceiveTransactionFlow
-import net.corda.core.flows.SendStateAndRefFlow
 import net.corda.core.flows.StartableByRPC
 import net.corda.core.identity.Party
 import net.corda.core.transactions.TransactionBuilder
@@ -15,9 +10,10 @@ import net.corda.core.utilities.ProgressTracker
 import net.corda.examples.fx.rate_provider.QueryExchangeRateFlow
 import net.corda.examples.fx.shared.domain.ExchangeRate
 import net.corda.examples.fx.shared.domain.ExchangeUsingRate
-import net.corda.examples.fx.shared.flows.IdentitySyncForBuilderFlow
+import net.corda.examples.fx.shared.flows.ReceiveSignedTransaction
+import net.corda.examples.fx.shared.flows.SendTransactionProposal
+import net.corda.examples.fx.shared.flows.generateSpend
 import net.corda.finance.contracts.asset.Cash
-import net.corda.finance.flows.CashException
 import java.time.Instant
 import java.util.*
 
@@ -29,36 +25,27 @@ class BuyCurrencyFlow(private val buyAmount: Amount<Currency>, private val saleC
     @Suspendable
     override fun call() {
 
-        logger.info("Asking provider ${rateProvider.name} for exchange rate.")
+        // TODO introduce progressTracker
 
+        logger.info("Asking provider ${rateProvider.name} for exchange rate.")
         val timestamp = Instant.now()
         val exchangeRate = subFlow(QueryExchangeRateFlow(saleCurrency, buyAmount.token, timestamp, rateProvider)) ?: throw Exception("No exchange rate between $saleCurrency and ${buyAmount.token}.")
-        val sellAmount = Amount.fromDecimal(buyAmount.toDecimal().multiply(exchangeRate), saleCurrency)
 
         logger.info("Generating spend using exchange rate $exchangeRate.")
+        val sellAmount = Amount.fromDecimal(buyAmount.toDecimal().multiply(exchangeRate), saleCurrency)
+        val (txBuilder, anonymisedSpendOwnerKeys) = Cash.generateSpend(TransactionBuilder(notary), serviceHub, sellAmount, seller)
 
-        val (txBuilder, anonymisedSpendOwnerKeys) = try {
-            // TODO maybe replace with the extension function
-            Cash.generateSpend(serviceHub, TransactionBuilder(notary = notary), sellAmount, seller)
-        } catch (e: InsufficientBalanceException) {
-            throw CashException("Insufficient cash for spend: ${e.message}", e)
-        }
-
+        logger.info("Sending transaction proposal to the seller.")
         val rate = ExchangeRate(saleCurrency, buyAmount.token, exchangeRate)
         txBuilder.addCommand(ExchangeUsingRate(rate = rate, timestamp = timestamp, buyAmount = buyAmount, sellAmount = sellAmount, rateProviderName = rateProvider.name), rateProvider.owningKey)
 
-        logger.info("Sending signed transaction to seller.")
         val sellerSession = initiateFlow(seller)
-        // TODO maybe refactor to be automatic
-        subFlow(SendStateAndRefFlow(sellerSession, txBuilder.inputStates().map { serviceHub.toStateAndRef<ContractState>(it) }))
-        sellerSession.send(txBuilder)
-        // TODO maybe refactor to be automatic
-        subFlow(IdentitySyncForBuilderFlow.Send(sellerSession, txBuilder))
+        subFlow(SendTransactionProposal(sellerSession, txBuilder))
 
-        // TODO maybe refactor to be automatic
-        subFlow(IdentitySyncFlow.Receive(sellerSession))
-        val signedBySeller = subFlow(ReceiveTransactionFlow(sellerSession, checkSufficientSignatures = false))
+        logger.info("Receiving signed transaction from the seller.")
+        val signedBySeller = subFlow(ReceiveSignedTransaction(sellerSession))
 
+        logger.info("Checking transaction sent by the seller.")
         signedBySeller.tx.apply {
             val counterPartyIdentities = commands.single { it.value is Cash.Commands.Move }.signers.map { serviceHub.identityService.partyFromKey(it) }.map { serviceHub.identityService.requireWellKnownPartyFromAnonymous(it!!) }
             require(commands.any { it.value is Cash.Commands.Move && seller.owningKey in counterPartyIdentities.map { it.owningKey } }) { "Missing move cash command from buyer." }
