@@ -1,6 +1,7 @@
 package net.corda.examples.fx.buyer
 
 import co.paralleluniverse.fibers.Suspendable
+import net.corda.confidential.IdentitySyncFlow
 import net.corda.core.contracts.Amount
 import net.corda.core.contracts.ContractState
 import net.corda.core.contracts.InsufficientBalanceException
@@ -36,6 +37,7 @@ class BuyCurrencyFlow(private val buyAmount: Amount<Currency>, private val saleC
         logger.info("Generating spend using exchange rate $exchangeRate.")
 
         val (txBuilder, anonymisedSpendOwnerKeys) = try {
+            // TODO maybe replace with the extension function
             Cash.generateSpend(serviceHub, TransactionBuilder(notary = notary), sellAmount, seller)
         } catch (e: InsufficientBalanceException) {
             throw CashException("Insufficient cash for spend: ${e.message}", e)
@@ -46,11 +48,20 @@ class BuyCurrencyFlow(private val buyAmount: Amount<Currency>, private val saleC
 
         logger.info("Sending signed transaction to seller.")
         val sellerSession = initiateFlow(seller)
+        // TODO maybe refactor to be automatic
         subFlow(SendStateAndRefFlow(sellerSession, txBuilder.inputStates().map { serviceHub.toStateAndRef<ContractState>(it) }))
         sellerSession.send(txBuilder)
+        // TODO maybe refactor to be automatic
+        subFlow(FxIdentitySyncFlow.Send(sellerSession, txBuilder))
+
+        // TODO maybe refactor to be automatic
+        subFlow(IdentitySyncFlow.Receive(sellerSession))
         val signedBySeller = subFlow(ReceiveTransactionFlow(sellerSession, checkSufficientSignatures = false))
 
         signedBySeller.tx.apply {
+            val counterPartyIdentities = commands.single { it.value is Cash.Commands.Move }.signers.map { serviceHub.identityService.partyFromKey(it) }.map { serviceHub.identityService.requireWellKnownPartyFromAnonymous(it!!) }
+            require(commands.any { it.value is Cash.Commands.Move && seller.owningKey in counterPartyIdentities.map { it.owningKey } }) { "Missing move cash command from buyer." }
+
             require(outputStates.filterIsInstance<Cash.State>().filter { it.owner == ourIdentity }.singleOrNull { it.amount.toDecimal() == buyAmount.toDecimal() && it.amount.token.product == buyAmount.token } != null) { "Missing bought output state of $buyAmount in transaction signed by seller!" }
             require(commands.any { it.value is Cash.Commands.Move && seller.owningKey in it.signers }) { "Missing move cash command from seller." }
         }

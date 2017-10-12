@@ -1,6 +1,7 @@
 package net.corda.examples.fx.seller
 
 import co.paralleluniverse.fibers.Suspendable
+import net.corda.confidential.IdentitySyncFlow
 import net.corda.core.contracts.Amount
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.ContractState
@@ -53,8 +54,11 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
 
         progressTracker.currentStep = STARTING
 
+        // TODO maybe refactor to be automatic
         subFlow(ReceiveStateAndRefFlow<ContractState>(session))
         val buyerTx = session.receive<TransactionBuilder>().unwrap { it }
+        // TODO maybe refactor to be automatic
+        subFlow(IdentitySyncFlow.Receive(session))
 
         val command = buyerTx.commands().single { it.value is ExchangeUsingRate }
         val exchangeRate = command.value as ExchangeUsingRate
@@ -65,7 +69,10 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
 
         val sellAmount = exchangeRate.sellAmount
         buyerTx.outputStates().filter { it.data is Cash.State }.map { it.data as Cash.State }.filter { it.owner == ourIdentity }.singleOrNull { it.amount.toDecimal() == sellAmount.toDecimal() && it.amount.token.product == sellAmount.token } ?: throw Exception("Missing bought output state of $sellAmount signed from buyer!")
-        require(buyerTx.commands().any { it.value is Cash.Commands.Move && session.counterparty.owningKey in it.signers }) { "Missing move cash command from buyer." }
+
+        // TODO identityService could do with a method that identifies a well known party from a key, whether anonymised or not.
+        val counterPartyIdentities = buyerTx.commands().single { it.value is Cash.Commands.Move }.signers.map { serviceHub.identityService.partyFromKey(it) }.map { serviceHub.identityService.requireWellKnownPartyFromAnonymous(it!!) }
+        require(buyerTx.commands().any { it.value is Cash.Commands.Move && session.counterparty.owningKey in counterPartyIdentities.map { it.owningKey } }) { "Missing move cash command from buyer." }
 
         progressTracker.currentStep = GENERATING_SPEND
 
@@ -92,6 +99,8 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
 
         val finalTx = anonymisedSpendOwnerKeys.fold(serviceHub.addSignature(signedTx).withAdditionalSignature(rateProviderSignature), serviceHub::addSignature)
 
+        // TODO maybe refactor to be automatic
+        subFlow(IdentitySyncFlow.Send(session, finalTx.tx))
         logger.info("Sending final signed transaction to buyer.")
         subFlow(SendTransactionFlow(session, finalTx))
     }
@@ -108,7 +117,6 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
 
     private fun areEqual(one: BigDecimal, other: BigDecimal): Boolean {
 
-        logger.info("Comparing $one with $other.")
         return one.compareTo(other) == 0
     }
 }
