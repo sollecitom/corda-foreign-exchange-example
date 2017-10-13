@@ -34,45 +34,45 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
         val GENERATING_SPEND = object : ProgressTracker.Step("Generating spend to fulfil exchange") {}
         val CONFIRMING_RATE_WITH_PROVIDER = object : ProgressTracker.Step("Confirming exchange rate with provider") {}
         val SIGNING_TRANSACTION = object : ProgressTracker.Step("Signing buyer's proposal") {}
-        val SENDING_TRANSACTION = object : ProgressTracker.Step("Sending signed transaction back to buyer") {}
+        val SENDING_BACK_TRANSACTION = object : ProgressTracker.Step("Sending signed transaction back to buyer") {}
     }
 
-    override val progressTracker = ProgressTracker(RECEIVING_PROPOSAL, CHECKING_PROPOSAL, GENERATING_SPEND, CONFIRMING_RATE_WITH_PROVIDER, SIGNING_TRANSACTION, SENDING_TRANSACTION)
+    override val progressTracker = ProgressTracker(RECEIVING_PROPOSAL, CHECKING_PROPOSAL, GENERATING_SPEND, CONFIRMING_RATE_WITH_PROVIDER, SIGNING_TRANSACTION, SENDING_BACK_TRANSACTION)
 
     @Suspendable
     override fun call() {
 
-        // TODO introduce progress tracker
-
-        logger.info("Receiving buyer proposal.")
+        progressTracker.currentStep = RECEIVING_PROPOSAL
         val buyerProposal = subFlow(ReceiveTransactionProposal(session))
 
-        logger.info("Checking buyer proposal.")
+        progressTracker.currentStep = CHECKING_PROPOSAL
         val (rateProvider, exchangeRate) = checkProposal(buyerProposal)
 
-        logger.info("Generating spend using exchange rate $exchangeRate.")
-        // Self issuing the amount necessary for the trade - obviously just for the sake of the example.
+        progressTracker.currentStep = GENERATING_SPEND
+        // TODO self issuing the amount necessary for the trade - obviously just for the sake of the example.
         subFlow(IssueCashFlow(exchangeRate.buyAmount, buyerProposal.notary!!))
         val (tx, anonymisedSpendOwnerKeys) = Cash.generateSpend(buyerProposal, serviceHub, exchangeRate.buyAmount, session.counterparty)
 
-        logger.info("Asking provider to sign rate ${exchangeRate.rate}.")
-        val signedTx = toTransaction(tx, anonymisedSpendOwnerKeys)
-        val partialMerkleTree = signedTx.tx.buildFilteredTransaction(Predicate { filtering(it) })
-        val rateProviderSignature = subFlow(SignExchangeRateFlow(signedTx.tx, partialMerkleTree, rateProvider))
+        progressTracker.currentStep = CONFIRMING_RATE_WITH_PROVIDER
+        val signedTx = confirmRate(tx, rateProvider, anonymisedSpendOwnerKeys)
 
-        val finalTx = anonymisedSpendOwnerKeys.fold(serviceHub.addSignature(signedTx).withAdditionalSignature(rateProviderSignature), serviceHub::addSignature)
+        progressTracker.currentStep = SIGNING_TRANSACTION
+        val finalTx = serviceHub.addSignature(signedTx)
 
-        logger.info("Sending final signed transaction to buyer.")
+        progressTracker.currentStep = SENDING_BACK_TRANSACTION
         subFlow(SendSignedTransaction(session, finalTx))
     }
 
-    private fun toTransaction(builder: TransactionBuilder, anonymisedSpendOwnerKeys: List<PublicKey>): SignedTransaction {
+    @Suspendable
+    private fun confirmRate(builder: TransactionBuilder, rateProvider: Party, anonymisedSpendOwnerKeys: List<PublicKey>): SignedTransaction {
 
-        var tx = serviceHub.signInitialTransaction(builder, anonymisedSpendOwnerKeys[0])
-        if (anonymisedSpendOwnerKeys.size > 1) {
-            tx = anonymisedSpendOwnerKeys.slice(1 until anonymisedSpendOwnerKeys.size).fold(tx, serviceHub::addSignature)
+        var transaction = serviceHub.signInitialTransaction(builder, anonymisedSpendOwnerKeys[0])
+        when {
+            anonymisedSpendOwnerKeys.size > 1 -> transaction = anonymisedSpendOwnerKeys.slice(1 until anonymisedSpendOwnerKeys.size).fold(transaction, serviceHub::addSignature)
         }
-        return tx
+        val partialMerkleTree = transaction.buildFilteredTransaction(Predicate { filtering(it) })
+        val rateProviderSignature = subFlow(SignExchangeRateFlow(transaction.tx, partialMerkleTree, rateProvider))
+        return transaction.withAdditionalSignature(rateProviderSignature)
     }
 
     private fun checkProposal(proposal: TransactionBuilder): CheckProposalResult {
