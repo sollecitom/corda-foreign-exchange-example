@@ -61,8 +61,7 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
         val partialMerkleTree = signedTx.tx.buildFilteredTransaction(Predicate { filtering(it) })
         val rateProviderSignature = subFlow(SignExchangeRateFlow(signedTx.tx, partialMerkleTree, rateProvider))
 
-        // TODO try to remove serviceHub.addSignature(signedTx) here
-        val finalTx = anonymisedSpendOwnerKeys.fold(serviceHub.addSignature(signedTx).withAdditionalSignature(rateProviderSignature), serviceHub::addSignature)
+        val finalTx = anonymisedSpendOwnerKeys.fold(signedTx.withAdditionalSignature(rateProviderSignature), serviceHub::addSignature)
 
         logger.info("Sending final signed transaction to buyer.")
         subFlow(SendSignedTransaction(session, finalTx))
