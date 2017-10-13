@@ -13,6 +13,7 @@ const val CORDA_NODE_HOST = "config.corda.connection.node.host"
 const val CORDA_NODE_RPC_PORT = "config.corda.connection.node.ports.rpc"
 const val SELLER_NAME = "config.fx.parties.seller.name"
 const val RATE_PROVIDER_NAME = "config.fx.parties.rateprovider.name"
+const val NOTARY_NAME = "config.fx.parties.notary.name"
 
 @Component
 private class ResolvedCordaNodeConfiguration @Autowired private constructor(
@@ -21,7 +22,8 @@ private class ResolvedCordaNodeConfiguration @Autowired private constructor(
         @Value("\${$CORDA_USER_NAME}") username: String,
         @Value("\${$CORDA_USER_PASSWORD}") password: String,
         @Value("\${$SELLER_NAME}") val seller: String,
-        @Value("\${$RATE_PROVIDER_NAME}") val rateProvider: String) : CordaNodeConfiguration {
+        @Value("\${$RATE_PROVIDER_NAME}") val rateProvider: String,
+        @Value("\${$NOTARY_NAME}") val notary: String) : CordaNodeConfiguration {
 
     override val user = User(username, password, setOf("ALL"))
 
@@ -30,4 +32,6 @@ private class ResolvedCordaNodeConfiguration @Autowired private constructor(
     override val sellerName: CordaX500Name = CordaX500Name.parse(seller)
 
     override val rateProviderName: CordaX500Name = CordaX500Name.parse(rateProvider)
+
+    override val notaryName: CordaX500Name = CordaX500Name.parse(notary)
 }

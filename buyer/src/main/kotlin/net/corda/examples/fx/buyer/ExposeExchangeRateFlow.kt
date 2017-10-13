@@ -14,7 +14,13 @@ import java.util.*
 @StartableByRPC
 class ExposeExchangeRateFlow(private val fromCurrency: Currency, private val toCurrency: Currency, private val rateProvider: Party) : FlowLogic<ExposeExchangeRateResponse>() {
 
-    override val progressTracker = ProgressTracker()
+    private companion object {
+
+        val ASKING_RATE_FROM_PROVIDER = object : ProgressTracker.Step("Asking exchange rate from provider") {}
+        val RETURNING_RESPONSE = object : ProgressTracker.Step("Returning response") {}
+    }
+
+    override val progressTracker = ProgressTracker(ASKING_RATE_FROM_PROVIDER, RETURNING_RESPONSE)
 
     @Suspendable
     override fun call(): ExposeExchangeRateResponse {

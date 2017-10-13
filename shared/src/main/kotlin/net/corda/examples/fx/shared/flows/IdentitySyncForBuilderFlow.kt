@@ -12,6 +12,7 @@ import net.corda.core.utilities.unwrap
 
 object IdentitySyncForBuilderFlow {
 
+    // TODO remove this after we migrate the one in Corda to use a interface both TransactionBuilder and Wire/LedgerTransaction implement.
     class Send(private val otherSide: FlowSession, private val tx: TransactionBuilder, override val progressTracker: ProgressTracker = tracker()) : FlowLogic<Unit>() {
 
         companion object {

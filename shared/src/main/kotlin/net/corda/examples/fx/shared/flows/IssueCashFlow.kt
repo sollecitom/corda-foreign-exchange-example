@@ -11,7 +11,7 @@ import net.corda.finance.flows.AbstractCashFlow
 import net.corda.finance.flows.CashIssueFlow
 import java.util.*
 
-// TODO maybe remove this and use CashIssueFlow directly
+// TODO this is just to avoid the ugly OpaqueBytes leaking in the flows.
 @InitiatingFlow
 @StartableByRPC
 class IssueCashFlow(private val amount: Amount<Currency>, private val notary: Party) : FlowLogic<AbstractCashFlow.Result>() {

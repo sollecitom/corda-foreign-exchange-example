@@ -18,6 +18,7 @@ import java.util.*
 class RateProvider(override val services: ServiceHub) : SingletonSerializeAsToken(), OracleService {
 
     companion object {
+
         private val logger = loggerFor<RateProvider>()
     }
 

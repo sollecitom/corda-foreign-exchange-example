@@ -10,4 +10,5 @@ internal interface CordaNodeConfiguration {
     val user: User
     val sellerName: CordaX500Name
     val rateProviderName: CordaX500Name
+    val notaryName: CordaX500Name
 }

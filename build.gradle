@@ -122,14 +122,16 @@ dependencies {
 
 task deployNodes(type: Cordform, dependsOn: ['jar']) {
     directory "./build/nodes"
-    networkMap "O=R3cev,OU=corda,L=London,C=GB"
+    networkMap "O=R3cev,L=London,C=GB"
+//    networkMap "O=R3cev,OU=corda,L=London,C=GB"
     node {
-        name "O=R3cev,OU=corda,L=London,C=GB"
+        name "O=R3cev,L=London,C=GB"
+//        name "O=R3cev,OU=corda,L=London,C=GB"
         advertisedServices = ["corda.notary.simple"]
         p2pPort 10002
         rpcPort 10003
         // TODO try to remove this
-        cordapps = ["net.corda.examples.fx:shared:1.0"]
+//        cordapps = ["net.corda.examples.fx:shared:1.0"]
     }
     node {
         name "O=Buyer,L=London,C=GB"
