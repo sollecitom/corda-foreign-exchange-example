@@ -4,7 +4,7 @@
 
 ## Basic information
 
-Currently based upon Corda M16.
+Currently based upon Corda version 1.0
 
 This example illustrates how a foreign currency exchange could be implemented using Corda.
 
