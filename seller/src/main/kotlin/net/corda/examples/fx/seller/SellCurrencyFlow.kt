@@ -7,6 +7,7 @@ import net.corda.core.flows.FlowSession
 import net.corda.core.flows.InitiatedBy
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
+import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.ProgressTracker
 import net.corda.examples.fx.buyer.BuyCurrencyFlowDefinition
@@ -28,15 +29,15 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
 
         val RATE_PROVIDERS_WHITELIST = setOf(CordaX500Name(organisation = "Rate-Provider", locality = "Austin", country = "US"))
 
-        val STARTING = object : ProgressTracker.Step("STARTING") {}
-        val GENERATING_SPEND = object : ProgressTracker.Step("GENERATING_SPEND") {}
-        val VERIFYING_TRANSACTION = object : ProgressTracker.Step("VERIFYING_TRANSACTION") {}
-        val SIGNING_TRANSACTION = object : ProgressTracker.Step("SIGNING_TRANSACTION") {}
-
-        val STEPS: Array<ProgressTracker.Step> = arrayOf(STARTING, GENERATING_SPEND, VERIFYING_TRANSACTION, SIGNING_TRANSACTION)
+        val RECEIVING_PROPOSAL = object : ProgressTracker.Step("Receiving buyer's proposal") {}
+        val CHECKING_PROPOSAL = object : ProgressTracker.Step("Checking buyer's proposal") {}
+        val GENERATING_SPEND = object : ProgressTracker.Step("Generating spend to fulfil exchange") {}
+        val CONFIRMING_RATE_WITH_PROVIDER = object : ProgressTracker.Step("Confirming exchange rate with provider") {}
+        val SIGNING_TRANSACTION = object : ProgressTracker.Step("Signing buyer's proposal") {}
+        val SENDING_TRANSACTION = object : ProgressTracker.Step("Sending signed transaction back to buyer") {}
     }
 
-    override val progressTracker = ProgressTracker(*STEPS)
+    override val progressTracker = ProgressTracker(RECEIVING_PROPOSAL, CHECKING_PROPOSAL, GENERATING_SPEND, CONFIRMING_RATE_WITH_PROVIDER, SIGNING_TRANSACTION, SENDING_TRANSACTION)
 
     @Suspendable
     override fun call() {
@@ -54,17 +55,24 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
         subFlow(IssueCashFlow(exchangeRate.buyAmount, buyerProposal.notary!!))
         val (tx, anonymisedSpendOwnerKeys) = Cash.generateSpend(buyerProposal, serviceHub, exchangeRate.buyAmount, session.counterparty)
 
-        logger.info("Signing transaction.")
-        val signedTx = anonymisedSpendOwnerKeys.fold(serviceHub.signInitialTransaction(tx), serviceHub::addSignature)
-
         logger.info("Asking provider to sign rate ${exchangeRate.rate}.")
+        val signedTx = toTransaction(tx, anonymisedSpendOwnerKeys)
         val partialMerkleTree = signedTx.tx.buildFilteredTransaction(Predicate { filtering(it) })
         val rateProviderSignature = subFlow(SignExchangeRateFlow(signedTx.tx, partialMerkleTree, rateProvider))
 
-        val finalTx = anonymisedSpendOwnerKeys.fold(signedTx.withAdditionalSignature(rateProviderSignature), serviceHub::addSignature)
+        val finalTx = anonymisedSpendOwnerKeys.fold(serviceHub.addSignature(signedTx).withAdditionalSignature(rateProviderSignature), serviceHub::addSignature)
 
         logger.info("Sending final signed transaction to buyer.")
         subFlow(SendSignedTransaction(session, finalTx))
+    }
+
+    private fun toTransaction(builder: TransactionBuilder, anonymisedSpendOwnerKeys: List<PublicKey>): SignedTransaction {
+
+        var tx = serviceHub.signInitialTransaction(builder, anonymisedSpendOwnerKeys[0])
+        if (anonymisedSpendOwnerKeys.size > 1) {
+            tx = anonymisedSpendOwnerKeys.slice(1 until anonymisedSpendOwnerKeys.size).fold(tx, serviceHub::addSignature)
+        }
+        return tx
     }
 
     private fun checkProposal(proposal: TransactionBuilder): CheckProposalResult {
@@ -100,7 +108,7 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
 
         return one.compareTo(other) == 0
     }
-}
 
-@Suspendable
-fun filtering(elem: Any): Boolean = elem is Command<*> && elem.value is ExchangeUsingRate
+    @Suspendable
+    private fun filtering(elem: Any): Boolean = elem is Command<*> && elem.value is ExchangeUsingRate
+}
