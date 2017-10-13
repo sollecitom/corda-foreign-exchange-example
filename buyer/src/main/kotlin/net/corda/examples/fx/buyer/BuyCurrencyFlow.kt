@@ -1,74 +1,79 @@
 package net.corda.examples.fx.buyer
 
 import co.paralleluniverse.fibers.Suspendable
-import net.corda.contracts.asset.Cash
 import net.corda.core.contracts.Amount
-import net.corda.core.contracts.Command
 import net.corda.core.flows.FinalityFlow
-import net.corda.core.flows.ResolveTransactionsFlow
 import net.corda.core.flows.StartableByRPC
 import net.corda.core.identity.Party
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.ProgressTracker
-import net.corda.core.utilities.unwrap
 import net.corda.examples.fx.rate_provider.QueryExchangeRateFlow
-import net.corda.examples.fx.rate_provider.RateProviderInfo
-import net.corda.examples.fx.rate_provider.SignExchangeRateFlow
 import net.corda.examples.fx.shared.domain.ExchangeRate
 import net.corda.examples.fx.shared.domain.ExchangeUsingRate
+import net.corda.examples.fx.shared.flows.ReceiveSignedTransaction
+import net.corda.examples.fx.shared.flows.SendTransactionProposal
+import net.corda.examples.fx.shared.flows.generateSpend
+import net.corda.finance.contracts.asset.Cash
 import java.time.Instant
 import java.util.*
-import java.util.function.Predicate
 
 @StartableByRPC
-class BuyCurrencyFlow(buyAmount: Amount<Currency>, saleCurrency: Currency, seller: Party) : BuyCurrencyFlowDefinition(buyAmount, saleCurrency, seller) {
+class BuyCurrencyFlow(private val buyAmount: Amount<Currency>, private val saleCurrency: Currency, private val rateProvider: Party, private val notary: Party, private val seller: Party) : BuyCurrencyFlowDefinition() {
 
-    override val progressTracker = ProgressTracker()
+    private companion object {
+
+        val ASKING_RATE_FROM_PROVIDER = object : ProgressTracker.Step("Asking exchange rate from provider") {}
+        val GENERATING_SPEND = object : ProgressTracker.Step("Generating spend to fulfil exchange") {}
+        val PROPOSING_EXCHANGE_TO_SELLER = object : ProgressTracker.Step("Proposing currency exchange to seller") {}
+        val WAITING_FOR_SELLER_REPLY = object : ProgressTracker.Step("Waiting for seller's reply") {}
+        val CHECKING_SELLER_TRANSACTION = object : ProgressTracker.Step("Checking seller's transaction") {}
+        val SIGNING_TRANSACTION = object : ProgressTracker.Step("Signing transaction") {}
+        val COMMITTING_TRANSACTION = object : ProgressTracker.Step("Committing transaction to the ledger") {}
+    }
+
+    override val progressTracker = ProgressTracker(ASKING_RATE_FROM_PROVIDER, GENERATING_SPEND, PROPOSING_EXCHANGE_TO_SELLER, WAITING_FOR_SELLER_REPLY, CHECKING_SELLER_TRANSACTION, SIGNING_TRANSACTION, COMMITTING_TRANSACTION)
 
     @Suspendable
     override fun call() {
 
-        val notary = serviceHub.networkMapCache.getAnyNotary()
-
-        logger.info("Asking provider for exchange rate.")
-
+        progressTracker.currentStep = ASKING_RATE_FROM_PROVIDER
         val timestamp = Instant.now()
-        val rateProviderNode = serviceHub.networkMapCache.getNodesWithService(RateProviderInfo.serviceName).single()
-        val exchangeRate = subFlow(QueryExchangeRateFlow(saleCurrency, buyAmount.token, timestamp, rateProviderNode.legalIdentity)) ?: throw Exception("No exchange rate between $saleCurrency and ${buyAmount.token}.")
-        val sellAmount = Amount.fromDecimal(buyAmount.toDecimal().multiply(exchangeRate), saleCurrency)
-
-        logger.info("Generating spend using exchange rate $exchangeRate.")
-
-        val (spendTx, _) = serviceHub.vaultService.generateSpend(tx = TransactionBuilder(notary = notary), amount = sellAmount, to = seller)
-
-        val tx = TransactionBuilder(notary = notary)
-        spendTx.inputStates().map { tx.addInputState(serviceHub.toStateAndRef<Cash.State>(it)) }
-        spendTx.outputStates().map { tx.addOutputState(it.data) }
-
+        val exchangeRate = subFlow(QueryExchangeRateFlow(saleCurrency, buyAmount.token, timestamp, rateProvider)) ?: throw Exception("No exchange rate between $saleCurrency and ${buyAmount.token}.")
         val rate = ExchangeRate(saleCurrency, buyAmount.token, exchangeRate)
 
-        logger.info("Asking provider to sign rate $rate.")
+        progressTracker.currentStep = GENERATING_SPEND
+        val sellAmount = Amount.fromDecimal(buyAmount.toDecimal().multiply(rate.value), saleCurrency)
+        val (txBuilder, anonymisedSpendOwnerKeys) = Cash.generateSpend(TransactionBuilder(notary), serviceHub, sellAmount, seller)
 
-        tx.addCommand(ExchangeUsingRate(rate = rate, timestamp = timestamp, buyAmount = buyAmount, sellAmount = sellAmount), rateProviderNode.legalIdentity.owningKey)
+        progressTracker.currentStep = PROPOSING_EXCHANGE_TO_SELLER
+        val command = ExchangeUsingRate(rate = rate, timestamp = timestamp, buyAmount = buyAmount, sellAmount = sellAmount, rateProviderName = rateProvider.name)
+        txBuilder.addCommand(command, rateProvider.owningKey)
+        val sellerSession = initiateFlow(seller)
+        subFlow(SendTransactionProposal(sellerSession, txBuilder))
 
-        logger.info("Sending signed transaction to seller.")
-        val sellerSignedTx = sendAndReceive<SignedTransaction>(seller, tx).unwrap { it }
+        progressTracker.currentStep = WAITING_FOR_SELLER_REPLY
+        val signedBySeller = subFlow(ReceiveSignedTransaction(sellerSession))
 
-        sellerSignedTx.tx.apply {
-            require(commands.singleOrNull { it.value is Cash.Commands.Move } != null) { "Missing Move Cash command from seller." }
-            require(outputStates.filterIsInstance<Cash.State>().filter { it.owner == serviceHub.myInfo.legalIdentity }.singleOrNull { it.amount.toDecimal() == buyAmount.toDecimal() && it.amount.token.product == buyAmount.token } != null) { "Missing bought output state of $buyAmount in transaction signed by seller!" }
+        progressTracker.currentStep = CHECKING_SELLER_TRANSACTION
+        checkTransaction(signedBySeller, command)
+
+        progressTracker.currentStep = SIGNING_TRANSACTION
+        val finalTx = anonymisedSpendOwnerKeys.fold(serviceHub.addSignature(signedBySeller), serviceHub::addSignature)
+
+        progressTracker.currentStep = COMMITTING_TRANSACTION
+        subFlow(FinalityFlow(finalTx))
+    }
+
+    private fun checkTransaction(signedBySeller: SignedTransaction, command: ExchangeUsingRate) {
+
+        signedBySeller.tx.apply {
+            val counterPartyIdentities = commands.single { it.value is Cash.Commands.Move }.signers.map { serviceHub.identityService.partyFromKey(it) }.map { serviceHub.identityService.requireWellKnownPartyFromAnonymous(it!!) }
+            require(commands.any { it.value is Cash.Commands.Move && seller.owningKey in counterPartyIdentities.map { it.owningKey } }) { "Missing move cash command from buyer." }
+
+            require(outputStates.filterIsInstance<Cash.State>().filter { it.owner == ourIdentity }.singleOrNull { it.amount.toDecimal() == buyAmount.toDecimal() && it.amount.token.product == buyAmount.token } != null) { "Missing bought output state of $buyAmount in transaction signed by seller!" }
+            require(commands.any { it.value is Cash.Commands.Move && seller.owningKey in it.signers }) { "Missing move cash command from seller." }
+            require(commands.single { it.value is ExchangeUsingRate }.value == command) { "The terms of the exchange have been changed by the seller." }
         }
-
-        val dependencyTxIDs = sellerSignedTx.tx.inputs.map { it.txhash }.toSet()
-        subFlow(ResolveTransactionsFlow(dependencyTxIDs, seller))
-
-        val partialMerkleTree = sellerSignedTx.tx.buildFilteredTransaction(Predicate { filtering(it) })
-        val rateProviderSignature = subFlow(SignExchangeRateFlow(sellerSignedTx.tx, partialMerkleTree, rateProviderNode.legalIdentity))
-
-        subFlow(FinalityFlow(serviceHub.addSignature(sellerSignedTx).withAdditionalSignature(rateProviderSignature)))
     }
 }
-
-@Suspendable
-fun filtering(elem: Any): Boolean = elem is Command<*> && elem.value is ExchangeUsingRate

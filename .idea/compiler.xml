@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="CompilerConfiguration">
-    <bytecodeTargetLevel>
+    <bytecodeTargetLevel target="1.8">
       <module name="buyer-api_main" target="1.8" />
       <module name="buyer-api_test" target="1.8" />
       <module name="buyer-app_main" target="1.8" />
       <module name="buyer-app_test" target="1.8" />
       <module name="buyer_main" target="1.8" />
       <module name="buyer_test" target="1.8" />
+      <module name="corda-foreign-exchange-example_main" target="1.8" />
+      <module name="corda-foreign-exchange-example_test" target="1.8" />
       <module name="corda-fx-adapter_main" target="1.8" />
       <module name="corda-fx-adapter_test" target="1.8" />
       <module name="domain_main" target="1.8" />
       <module name="domain_test" target="1.8" />
-      <module name="fx-example_main" target="1.8" />
-      <module name="fx-example_test" target="1.8" />
       <module name="logging_main" target="1.8" />
       <module name="logging_test" target="1.8" />
       <module name="rate-provider-api_main" target="1.8" />

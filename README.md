@@ -41,7 +41,7 @@ The available endpoints on localhost:8080 are:
 1. GET /cash -> empty (200 OK).
 2. POST /cash with payload {"value": 1000.0, "currency": "GBP"} -> no response body (201 Created).
 3. GET /cash -> {"GBP":1000.0} (200 OK).
-4. GET /exchangeRate?from=GBP&to=USD {"rate":1.36,"from":"GBP","to":"USD"} (200 OK).
+4. GET /exchangeRate?from=GBP&to=USD -> {"rate":1.36,"from":"GBP","to":"USD"} (200 OK).
 5. POST /purchases with payload {"amount": {"value": 100.0, "currency": "USD"}, "currency": "GBP"} -> no response body (201 Created).
 6. GET /cash -> {"USD":100.0,"GBP":864.0} (200 OK).
-7. As expected the dollars have been bought and the remaining pounds £864 = £1000 - 1.36 (£/$) * $100.
+7. As expected, the dollars have been bought and the remaining pounds £864 = £1000 - 1.36 (£/$) * $100.

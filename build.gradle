@@ -2,11 +2,11 @@ import net.corda.plugins.Cordform
 
 buildscript {
     ext.java_version = '1.8'
-    ext.kotlin_version = '1.1.4-3'
+    ext.kotlin_version = '1.1.51'
     ext.junit_version = '5.0.0'
     ext.junit_gradle_plugin_version = '1.0.0'
-    ext.corda_release_version = '0.14.0'
-    ext.corda_plugins_version = '0.16.2'
+    ext.corda_release_version = '1.0.0'
+    ext.corda_plugins_version = '1.1.1'
     ext.quasar_version = '0.7.9'
     ext.graphstream_version = '1.3'
 
@@ -108,50 +108,54 @@ subprojects { it ->
 }
 
 dependencies {
-    cordaRuntime "net.corda:corda:$corda_release_version"
-
     cordapp project(":shared")
     cordapp project(":buyer")
     cordapp project(":buyer-api")
     cordapp project(":seller")
-    cordapp project(":seller-api")
     cordapp project(":rate-provider")
     cordapp project(":rate-provider-api")
+
+    cordapp "net.corda:corda-finance:$corda_release_version"
+
+    cordaRuntime "net.corda:corda:$corda_release_version"
 }
 
 task deployNodes(type: Cordform, dependsOn: ['jar']) {
     directory "./build/nodes"
-    networkMap "CN=Controller,O=R3,OU=corda,L=London,C=UK"
+    networkMap "O=R3cev,L=London,C=GB"
+//    networkMap "O=R3cev,OU=corda,L=London,C=GB"
     node {
-        name "CN=Controller,O=R3,OU=corda,L=London,C=UK"
-        advertisedServices = ["corda.notary.validating"]
+        name "O=R3cev,L=London,C=GB"
+//        name "O=R3cev,OU=corda,L=London,C=GB"
+        advertisedServices = ["corda.notary.simple"]
         p2pPort 10002
         rpcPort 10003
-        cordapps = ["net.corda.examples.fx:shared:1.0"]
+        // TODO try to remove this
+//        cordapps = ["net.corda.examples.fx:shared:1.0"]
     }
     node {
-        name "CN=Buyer,O=Buyer,L=London,C=UK"
+        name "O=Buyer,L=London,C=GB"
         advertisedServices = []
         p2pPort 10005
         rpcPort 10006
-        cordapps = ["net.corda.examples.fx:shared:1.0", "net.corda.examples.fx:rate-provider-api:1.0", "net.corda.examples.fx:buyer-api:1.0", "net.corda.examples.fx:buyer:1.0"]
+        cordapps = ["net.corda.examples.fx:shared:1.0", "net.corda.examples.fx:rate-provider-api:1.0", "net.corda.examples.fx:buyer-api:1.0", "net.corda.examples.fx:buyer:1.0", "net.corda:corda-finance:1.0.0"]
         rpcUsers = [[user: "user1", "password": "test", "permissions": ["ALL"]]]
 //        rpcUsers = [[user: "user1", "password": "test", "permissions": ["StartFlow.net.corda.examples.fx.buyer.BuyCurrencyFlow", "StartFlow.net.corda.examples.fx.shared.flows.IssueCashFlow", "StartFlow.net.corda.examples.fx.buyer.ExposeExchangeRateFlow"]]]
     }
     node {
-        name "CN=Seller,O=Seller,L=New York,C=US"
+        name "O=Seller,L=New York,C=US"
         advertisedServices = ["net.corda.examples.fx.shared.services.sellCash"]
         p2pPort 10008
         rpcPort 10009
-        cordapps = ["net.corda.examples.fx:shared:1.0", "net.corda.examples.fx:rate-provider-api:1.0", "net.corda.examples.fx:buyer-api:1.0", "net.corda.examples.fx:seller-api:1.0", "net.corda.examples.fx:seller:1.0"]
+        cordapps = ["net.corda.examples.fx:shared:1.0", "net.corda.examples.fx:rate-provider-api:1.0", "net.corda.examples.fx:buyer-api:1.0", "net.corda.examples.fx:seller:1.0", "net.corda:corda-finance:1.0.0"]
         rpcUsers = [[user: "user1", "password": "test", "permissions": []]]
     }
     node {
-        name "CN=Rate-Provider,O=Rate-Provider,L=Austin,C=US"
+        name "O=Rate-Provider,L=Austin,C=US"
         advertisedServices = ["fx.rate_provider"]
         p2pPort 10011
         rpcPort 10012
-        cordapps = ["net.corda.examples.fx:shared:1.0", "net.corda.examples.fx:rate-provider-api:1.0", "net.corda.examples.fx:rate-provider:1.0"]
+        cordapps = ["net.corda.examples.fx:shared:1.0", "net.corda.examples.fx:rate-provider-api:1.0", "net.corda.examples.fx:rate-provider:1.0", "net.corda:corda-finance:1.0.0"]
         rpcUsers = [[user: "user1", "password": "test", "permissions": []]]
     }
 }

@@ -1,4 +1,4 @@
-package net.corda.examples.fx.buyer_app.web
+package net.corda.examples.fx.buyer_app
 
 import org.springframework.boot.Banner
 import org.springframework.boot.SpringApplication

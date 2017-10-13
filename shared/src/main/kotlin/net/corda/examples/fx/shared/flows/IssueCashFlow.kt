@@ -7,17 +7,18 @@ import net.corda.core.flows.InitiatingFlow
 import net.corda.core.flows.StartableByRPC
 import net.corda.core.identity.Party
 import net.corda.core.utilities.OpaqueBytes
-import net.corda.flows.CashIssueFlow
+import net.corda.finance.flows.AbstractCashFlow
+import net.corda.finance.flows.CashIssueFlow
 import java.util.*
 
+// TODO this is just to avoid the ugly OpaqueBytes leaking in the flows.
 @InitiatingFlow
 @StartableByRPC
-class IssueCashFlow(private val amount: Amount<Currency>, private val recipient: Party) : FlowLogic<Unit>() {
+class IssueCashFlow(private val amount: Amount<Currency>, private val notary: Party) : FlowLogic<AbstractCashFlow.Result>() {
 
     @Suspendable
-    override fun call() {
+    override fun call(): AbstractCashFlow.Result {
 
-        val notary = serviceHub.networkMapCache.getAnyNotary()!!
-        subFlow(CashIssueFlow(amount, OpaqueBytes.of(0), recipient, notary, false))
+        return subFlow(CashIssueFlow(amount, OpaqueBytes.of(0), notary))
     }
 }
