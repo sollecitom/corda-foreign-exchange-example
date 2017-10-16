@@ -12,7 +12,7 @@ import net.corda.core.utilities.ProgressTracker
 import net.corda.core.utilities.unwrap
 
 @InitiatingFlow
-class SignExchangeRateFlow(private val tx: WireTransaction, private val partialMerkleTx: FilteredTransaction, private val self: Party) : FlowLogic<TransactionSignature>() {
+class SignExchangeRateFlow(private val tx: WireTransaction, private val partialMerkleTx: FilteredTransaction, private val oracle: Party) : FlowLogic<TransactionSignature>() {
 
     private companion object {
 
@@ -26,12 +26,12 @@ class SignExchangeRateFlow(private val tx: WireTransaction, private val partialM
     override fun call(): TransactionSignature {
 
         progressTracker.currentStep = SIGNING_REQUEST
-        val session = initiateFlow(self)
+        val session = initiateFlow(oracle)
         val resp = session.sendAndReceive<TransactionSignature>(SignExchangeRateRequest(partialMerkleTx))
 
         progressTracker.currentStep = RETURNING_SIGNATURE
         return resp.unwrap { sig ->
-            check(sig.by == self.owningKey)
+            check(sig.by == oracle.owningKey)
             tx.checkSignature(sig)
             sig
         }
