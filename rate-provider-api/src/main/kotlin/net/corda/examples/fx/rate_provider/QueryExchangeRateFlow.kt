@@ -11,6 +11,17 @@ import java.math.BigDecimal
 import java.time.Instant
 import java.util.*
 
+/**
+ * Initiating flow to query an exchange rate.
+ * Useful to avoid exposing Rate Provider's logic to clients.
+ *
+ * @param from the source [Currency] for the exchange.
+ * @param to the destination [Currency] for the exchange.
+ * @param timestamp the point in time this information is required at.
+ * @param self the rate provider [Party].
+ *
+ * @return a [BigDecimal] exchange rate, or `null` if no rate is known between the two currencies.
+ */
 @InitiatingFlow
 class QueryExchangeRateFlow(private val from: Currency, private val to: Currency, private val timestamp: Instant, private val self: Party) : FlowLogic<BigDecimal?>() {
 
@@ -34,8 +45,14 @@ class QueryExchangeRateFlow(private val from: Currency, private val to: Currency
     }
 }
 
+/**
+ * Request object for [QueryExchangeRateFlow].
+ */
 @CordaSerializable
 data class QueryExchangeRateRequest(val from: Currency, val to: Currency, val timestamp: Instant)
 
+/**
+ * Response object for [QueryExchangeRateFlow].
+ */
 @CordaSerializable
 data class QueryExchangeRateResponse(val rate: BigDecimal?)

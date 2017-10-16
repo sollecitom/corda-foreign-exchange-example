@@ -3,6 +3,7 @@ package net.corda.examples.fx.rate_provider
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.CommandData
 import net.corda.core.crypto.TransactionSignature
+import net.corda.core.identity.Party
 import net.corda.core.internal.uncheckedCast
 import net.corda.core.node.ServiceHub
 import net.corda.core.transactions.FilteredTransaction
@@ -11,8 +12,19 @@ import org.slf4j.Logger
 import kotlin.reflect.KClass
 
 // TODO port this into a CorDapp designed to make Oracles' implementation easier
+/**
+ * Template Oracle Service that facilitates verification logic.
+ * It introduces a [sign] function that leverages some abstract functions implementors need to define.
+ */
 interface OracleService {
 
+    /**
+     * Signs a [FilteredTransaction] provided all relevant commands are valid.
+     *
+     * @param ftx the [FilteredTransaction] to inspect and sign.
+     *
+     * @return a [TransactionSignature] for the transaction.
+     */
     fun sign(ftx: FilteredTransaction): TransactionSignature {
 
         logger.info("Asked to sign transaction.")
@@ -32,25 +44,40 @@ interface OracleService {
     private fun check(elem: Any, validatingFunctions: Map<Class<out CommandData>, CommandValidation<*>>): Boolean {
 
         return when (elem) {
-            // Oracles only care about commands which have their public key in the signers list.
+        // Oracles only care about commands which have their public key in the signers list.
             elem is Command<*> && elem.isSignedByMe() && elem.value::class.java in validatingFunctions.keys -> {
 
                 val validation: CommandValidation<*> = validatingFunctions[(elem as Command<*>).value::class.java]!!
                 val validate: (command: CommandData) -> Boolean = uncheckedCast(validation.validate)
                 validate(validation.type.cast(elem.value))
             }
-            // Unknown commands are whitelisted
+        // Unknown commands are whitelisted
             else -> true
         }
     }
 
     data class CommandValidation<COMMAND : CommandData>(val type: Class<out COMMAND>, val validate: (command: COMMAND) -> Boolean)
 
+    /**
+     * A [Logger] to use in the template.
+     */
     val logger: Logger
 
+    /**
+     * The [ServiceHub].
+     */
     val services: ServiceHub
 
+    /**
+     * A [Set] of [CommandValidation] mapping a [CommandData] type to a validating function.
+     */
     val validatingFunctions: Set<CommandValidation<*>>
+
+    /**
+     * Provides the oracle's identity.
+     */
+    val ourIdentity: Party
+        get() = services.myInfo.legalIdentities[0]
 }
 
 inline infix fun <reified COMMAND : CommandData> KClass<COMMAND>.using(noinline validate: (command: COMMAND) -> Boolean) = OracleService.CommandValidation(this.java, validate)

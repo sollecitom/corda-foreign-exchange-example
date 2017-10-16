@@ -23,6 +23,11 @@ import java.math.BigDecimal
 import java.security.PublicKey
 import java.util.function.Predicate
 
+/**
+ * Dual logic for [BuyCurrencyFlowDefinition] on the Seller side.
+ *
+ * @param session the initiated session with the Buyer.
+ */
 @InitiatedBy(BuyCurrencyFlowDefinition::class)
 class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
 

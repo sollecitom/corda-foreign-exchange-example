@@ -11,6 +11,16 @@ import java.math.BigDecimal
 import java.time.Instant
 import java.util.*
 
+/**
+ * This flows asks the oracle for the exchange rate between two currencies.
+ * It is run by the Buyer so that the RateProvider doesn't have to allow any RPC connection.
+ *
+ * @param fromCurrency the source [Currency] in the rate.
+ * @param toCurrency the destination [Currency] in the rate.
+ * @param rateProvider the rate provider oracle [Party].
+ *
+ * @return the [ExposeExchangeRateResponse] wrapping the rate.
+ */
 @StartableByRPC
 class ExposeExchangeRateFlow(private val fromCurrency: Currency, private val toCurrency: Currency, private val rateProvider: Party) : FlowLogic<ExposeExchangeRateResponse>() {
 
@@ -36,5 +46,8 @@ class ExposeExchangeRateFlow(private val fromCurrency: Currency, private val toC
     }
 }
 
+/**
+ * Wraps a [BigDecimal] to make it optional.
+ */
 @CordaSerializable
 data class ExposeExchangeRateResponse(val rate: BigDecimal?)

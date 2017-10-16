@@ -7,6 +7,9 @@ import net.corda.core.flows.InitiatedBy
 import net.corda.core.utilities.ProgressTracker
 import net.corda.core.utilities.unwrap
 
+/**
+ * Handler flow for [SignExchangeRateFlow].
+ */
 @InitiatedBy(SignExchangeRateFlow::class)
 class SignExchangeRateFlowHandler(private val session: FlowSession) : FlowLogic<Unit>() {
 

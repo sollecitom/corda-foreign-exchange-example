@@ -11,6 +11,16 @@ import net.corda.core.transactions.WireTransaction
 import net.corda.core.utilities.ProgressTracker
 import net.corda.core.utilities.unwrap
 
+/**
+ * Initiating flow to sign a foreign currency exchange transaction.
+ * Useful to avoid exposing Rate Provider's logic to clients.
+ *
+ * @param tx the [WireTransaction] for the Rate Provider to sign.
+ * @param partialMerkleTx the [FilteredTransaction] the Rate Provider will have access to.
+ * @param self the Rate Provider [Party].
+ *
+ * @return the [TransactionSignature] from the Rate Provider.
+ */
 @InitiatingFlow
 class SignExchangeRateFlow(private val tx: WireTransaction, private val partialMerkleTx: FilteredTransaction, private val self: Party) : FlowLogic<TransactionSignature>() {
 
@@ -38,5 +48,8 @@ class SignExchangeRateFlow(private val tx: WireTransaction, private val partialM
     }
 }
 
+/**
+ * Request object for [SignExchangeRateFlow].
+ */
 @CordaSerializable
 data class SignExchangeRateRequest(val ftx: FilteredTransaction)

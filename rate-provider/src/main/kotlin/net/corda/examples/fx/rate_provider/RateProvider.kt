@@ -14,6 +14,9 @@ import java.math.BigDecimal
 import java.time.Instant
 import java.util.*
 
+/**
+ * Rate Provider [CordaService] able to provide data to handler flows.
+ */
 @CordaService
 class RateProvider(override val services: ServiceHub) : SingletonSerializeAsToken(), OracleService {
 
@@ -31,6 +34,15 @@ class RateProvider(override val services: ServiceHub) : SingletonSerializeAsToke
             ExchangeRate(EUR, GBP, 0.88)
     )
 
+    /**
+     * Provides the exchange rate between two currency at a point in time.
+     *
+     * @param from the source [Currency].
+     * @param to the destination [Currency].
+     * @param timestamp the [Instant] at which the rate is required.
+     *
+     * @return a [BigDecimal] representing the exchange rate, or `null` if no exchange rate is known.
+     */
     fun rateAtTime(from: Currency, to: Currency, timestamp: Instant): BigDecimal? {
 
         val rate = exchangeRates.singleOrNull { it.from == from && it.to == to }?.value
@@ -40,7 +52,7 @@ class RateProvider(override val services: ServiceHub) : SingletonSerializeAsToke
 
     private fun validateExchangeRate(command: ExchangeUsingRate): Boolean {
 
-        return command.rateProviderName == services.myInfo.legalIdentities[0].name && command.rate.value == rateAtTime(command.rate.from, command.rate.to, command.timestamp)
+        return command.rateProviderName == ourIdentity.name && command.rate.value == rateAtTime(command.rate.from, command.rate.to, command.timestamp)
     }
 
     override val validatingFunctions = setOf(ExchangeUsingRate::class using this::validateExchangeRate)

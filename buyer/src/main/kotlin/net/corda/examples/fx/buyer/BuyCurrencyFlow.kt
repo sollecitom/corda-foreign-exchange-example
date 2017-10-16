@@ -20,6 +20,14 @@ import net.corda.finance.contracts.asset.Cash
 import java.time.Instant
 import java.util.*
 
+/**
+ * This flow initiates the foreign currency exchange against the seller.
+ *
+ * @param buyAmount the [Amount] to buy.
+ * @param saleCurrency the currency for the input states of the transaction.
+ * @param rateProvider the rate provider oracle [Party].
+ * @param seller the seller [Party].
+ */
 @StartableByRPC
 class BuyCurrencyFlow(private val buyAmount: Amount<Currency>, private val saleCurrency: Currency, private val rateProvider: Party, private val notary: Party, private val seller: Party) : BuyCurrencyFlowDefinition() {
 
