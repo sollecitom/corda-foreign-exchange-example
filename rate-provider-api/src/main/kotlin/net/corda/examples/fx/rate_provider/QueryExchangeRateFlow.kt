@@ -23,7 +23,7 @@ import java.util.*
  * @return a [BigDecimal] exchange rate, or `null` if no rate is known between the two currencies.
  */
 @InitiatingFlow
-class QueryExchangeRateFlow(private val from: Currency, private val to: Currency, private val timestamp: Instant, private val self: Party) : FlowLogic<BigDecimal?>() {
+class QueryExchangeRateFlow(private val from: Currency, private val to: Currency, private val timestamp: Instant, private val oracle: Party) : FlowLogic<BigDecimal?>() {
 
     private companion object {
 
@@ -37,7 +37,7 @@ class QueryExchangeRateFlow(private val from: Currency, private val to: Currency
     override fun call(): BigDecimal? {
 
         progressTracker.currentStep = ASKING_RATE_TO_SERVICE
-        val session = initiateFlow(self)
+        val session = initiateFlow(oracle)
         val resp = session.sendAndReceive<QueryExchangeRateResponse>(QueryExchangeRateRequest(from, to, timestamp))
 
         progressTracker.currentStep = RETURNING_RATE

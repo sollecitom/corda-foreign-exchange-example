@@ -14,16 +14,19 @@ and how to use Oracles as part of Flows.
 It also demonstrate how to integrate CORDA into a web application.
 
 This repository is split into seven modules:
+    * The _shared_ module holds general types that all parties (buyers, sellers and exchange rate providers) need to use
+    * The _buyer_ module holds the flows and plugin run by the buyer of foreign exchange
+    * The _seller_ module holds the flow and plugin run by the seller of foreign exchange
+    * The _rate-provider_ module holds the flows, service and plugin run by the exchange rate provider
+    * The _buyer-api_ module holds the interface the seller of foreign exchange should use as an initiating flow when
+      writing a flow to speak to the buyer
+    * The _rate-provider_api_ module holds the interfaces the buyer and seller of foreign exchange should use as
+      initiating flows when querying the oracle for an exchange rate or a transaction signature
+    * The _buyer-app_ module holds two web server implementations: Ktor(buyer_app:web-server-ktor) and
+      Spring-Boot(buyer_app:web-server-spring-boot). These implementations are identical in behaviour and only there to
+      demonstrate that the client can be arbitrarily chosen
+    The purpose of a modular setup is to avoid having parties knowing the implementation code of other peers.
 
-1. A shared library which holds types that all parties need to use (_shared_).
-2. A buyer CorDApp, representing an entity that buys foreign currency (_buyer_).
-3. A buyer API, representing code from the buyer application visible from seller (_buyer-api_).
-4. A buyer Spring Boot application talking to the buyer node (_buyer-app_). There are 2 web server implementations: Ktor(buyer_app:web-server-ktor) and Spring-Boot(buyer_app:web-server-spring-boot).
-5. A seller CorDApp, representing an entity that sells foreign currency (_seller_).
-6. A rate provider CorDApp, representing an entity that provides currency exchange rates as an Oracle (_rate-provider_).
-7. A rate provider API, containing bindings for the buyer and the seller to call the Oracle (_rate-provider-api_).
-
-The purpose of a modular setup is to avoid having parties knowing the implementation code of other peers.
 The Spring Boot and Ktor webserver implementations are identical in behaviour and only there to demonstrate that the client can be arbitrarily chosen.
 
 ## How to run this example
