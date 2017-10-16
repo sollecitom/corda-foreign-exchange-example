@@ -2,6 +2,7 @@ package net.corda.examples.fx.seller
 
 import co.paralleluniverse.fibers.Suspendable
 import net.corda.core.contracts.Command
+import net.corda.core.contracts.ContractState
 import net.corda.core.flows.FlowLogic
 import net.corda.core.flows.FlowSession
 import net.corda.core.flows.InitiatedBy
@@ -84,6 +85,10 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
         exchangeRate.enforceConstraints(rateProvider, command.signers)
 
         val sellAmount = exchangeRate.sellAmount
+
+        require(proposal.inputStates().map { serviceHub.toStateAndRef<ContractState>(it) }.all { it.state.data is Cash.State }) { "All inputs should be Cash.State." }
+        require(proposal.inputStates().map { serviceHub.toStateAndRef<Cash.State>(it) }.none { it.state.data.owner == ourIdentity }) { "Found suspicious inputs owned by the seller as part of the proposal." }
+
         proposal.outputStates().filter { it.data is Cash.State }.map { it.data as Cash.State }.filter { it.owner == ourIdentity }.singleOrNull { it.amount.toDecimal() == sellAmount.toDecimal() && it.amount.token.product == sellAmount.token } ?: throw Exception("Missing bought output state of $sellAmount signed from buyer!")
 
         // TODO identityService could do with a method that identifies a well known party from a key, whether anonymised or not.

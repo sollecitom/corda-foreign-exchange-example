@@ -2,6 +2,8 @@ package net.corda.examples.fx.buyer
 
 import co.paralleluniverse.fibers.Suspendable
 import net.corda.core.contracts.Amount
+import net.corda.core.contracts.ContractState
+import net.corda.core.contracts.StateRef
 import net.corda.core.flows.FinalityFlow
 import net.corda.core.flows.StartableByRPC
 import net.corda.core.identity.Party
@@ -56,7 +58,7 @@ class BuyCurrencyFlow(private val buyAmount: Amount<Currency>, private val saleC
         val signedBySeller = subFlow(ReceiveSignedTransaction(sellerSession))
 
         progressTracker.currentStep = CHECKING_SELLER_TRANSACTION
-        checkTransaction(signedBySeller, command)
+        checkTransaction(signedBySeller, command, txBuilder.inputStates())
 
         progressTracker.currentStep = SIGNING_TRANSACTION
         val finalTx = anonymisedSpendOwnerKeys.fold(serviceHub.addSignature(signedBySeller), serviceHub::addSignature)
@@ -65,11 +67,14 @@ class BuyCurrencyFlow(private val buyAmount: Amount<Currency>, private val saleC
         subFlow(FinalityFlow(finalTx))
     }
 
-    private fun checkTransaction(signedBySeller: SignedTransaction, command: ExchangeUsingRate) {
+    private fun checkTransaction(signedBySeller: SignedTransaction, command: ExchangeUsingRate, proposedInputStates: List<StateRef>) {
 
         signedBySeller.tx.apply {
             val counterPartyIdentities = commands.single { it.value is Cash.Commands.Move }.signers.map { serviceHub.identityService.partyFromKey(it) }.map { serviceHub.identityService.requireWellKnownPartyFromAnonymous(it!!) }
             require(commands.any { it.value is Cash.Commands.Move && seller.owningKey in counterPartyIdentities.map { it.owningKey } }) { "Missing move cash command from buyer." }
+
+            require(inputs.map { serviceHub.toStateAndRef<ContractState>(it) }.all { it.state.data is Cash.State }) { "All inputs should be Cash.State." }
+            require(inputs.map { serviceHub.toStateAndRef<Cash.State>(it) }.filter { it.state.data.owner == ourIdentity }.all { it.ref in proposedInputStates }) { "Found suspicious additional inputs owned by the buyer that were not part of the proposal." }
 
             require(outputStates.filterIsInstance<Cash.State>().filter { it.owner == ourIdentity }.singleOrNull { it.amount.toDecimal() == buyAmount.toDecimal() && it.amount.token.product == buyAmount.token } != null) { "Missing bought output state of $buyAmount in transaction signed by seller!" }
             require(commands.any { it.value is Cash.Commands.Move && seller.owningKey in it.signers }) { "Missing move cash command from seller." }
