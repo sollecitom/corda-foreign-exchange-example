@@ -67,19 +67,22 @@ private class Server @Autowired internal constructor(private val service: FXServ
     private suspend fun readExchangeRate(call: ApplicationCall) {
 
         logger.info("Received read exchange rate request.")
-        val from = call.request.queryParameters["from"]?.let { Currency.getInstance(it) }
-        val to = call.request.queryParameters["to"]?.let { Currency.getInstance(it) }
-        if (from == null || to == null) {
-            call.respondText(text = message("Unspecified 'from' and 'to' currency codes query parameters."), contentType = ContentType.Application.Json, status = HttpStatusCode.BadRequest)
-            return
-        }
         try {
+            val from = call.request.queryParameters["from"]?.let(this::parseCurrencyCode)
+            val to = call.request.queryParameters["to"]?.let(this::parseCurrencyCode)
+            if (from == null || to == null) {
+                call.respondText(text = message("Unspecified 'from' and 'to' currency codes query parameters."), contentType = ContentType.Application.Json, status = HttpStatusCode.BadRequest)
+                return
+            }
+
             val rate = service.queryRate(from = from, to = to)
             if (rate == null) {
-                call.respondText(text = message("Not exchange rate found."), contentType = ContentType.Application.Json, status = HttpStatusCode.NotFound)
+                call.respondText(text = message("No exchange rate found."), contentType = ContentType.Application.Json, status = HttpStatusCode.NotFound)
             } else {
                 call.respondText(text = toJson(rate, from, to).toString(), contentType = ContentType.Application.Json, status = HttpStatusCode.OK)
             }
+        } catch (e: IllegalArgumentException) {
+            call.respondText(text = message(e.localizedMessage), contentType = ContentType.Application.Json, status = HttpStatusCode.BadRequest)
         } catch (e: Throwable) {
             logger.error("Error while trying to retrieve exchange rate.", e)
             call.respondText(text = message("Unknown error."), contentType = ContentType.Application.Json, status = HttpStatusCode.InternalServerError)
@@ -90,15 +93,17 @@ private class Server @Autowired internal constructor(private val service: FXServ
 
         val json = parser.parse(call.receiveText()) as JsonObject
         logger.info("Received cash acquisition request with payload: $json")
-        val amount = fromJson(json["amount"].asJsonObject)
-        val currency = Currency.getInstance(json["currency"].string)
         try {
+            val amount = fromJson(json["amount"].asJsonObject)
+            val currency = parseCurrencyCode(json["currency"].string)
             val result = service.buyMoneyAmount(amount, currency)
             if (result.missingAmount == null) {
                 call.respondText(text = "", contentType = ContentType.Application.Json, status = HttpStatusCode.Created)
             } else {
                 call.respondText(text = jsonObject("message" to "Insufficient funds to buy given money amount. Missing ${result.missingAmount}.", "missing" to toJson(result.missingAmount!!)).toString(), contentType = ContentType.Application.Json, status = HttpStatusCode(422, "Unprocessable Entity"))
             }
+        } catch (e: IllegalArgumentException) {
+            call.respondText(text = message(e.localizedMessage), contentType = ContentType.Application.Json, status = HttpStatusCode.BadRequest)
         } catch (e: Throwable) {
             logger.error("Error while trying to buy money.", e)
             call.respondText(text = message("Unknown error."), contentType = ContentType.Application.Json, status = HttpStatusCode.InternalServerError)
@@ -109,10 +114,12 @@ private class Server @Autowired internal constructor(private val service: FXServ
 
         val json = parser.parse(call.receiveText()) as JsonObject
         logger.info("Received cash issuance request with payload: $json")
-        val amount = fromJson(json)
         try {
+            val amount = fromJson(json)
             service.selfIssueCash(amount)
             call.respondText(text = "", contentType = ContentType.Application.Json, status = HttpStatusCode.Created)
+        } catch (e: IllegalArgumentException) {
+            call.respondText(text = message(e.localizedMessage), contentType = ContentType.Application.Json, status = HttpStatusCode.BadRequest)
         } catch (e: Throwable) {
             logger.error("Error while trying to self issue cash.", e)
             call.respondText(text = message("Unknown error."), contentType = ContentType.Application.Json, status = HttpStatusCode.InternalServerError)

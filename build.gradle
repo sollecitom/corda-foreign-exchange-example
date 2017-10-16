@@ -55,6 +55,7 @@ allprojects {
     }
 
     junitPlatform {
+        // comment here are the defaults
         // platformVersion '1.0.0'
         filters {
             engines {
@@ -123,15 +124,11 @@ dependencies {
 task deployNodes(type: Cordform, dependsOn: ['jar']) {
     directory "./build/nodes"
     networkMap "O=R3cev,L=London,C=GB"
-//    networkMap "O=R3cev,OU=corda,L=London,C=GB"
     node {
         name "O=R3cev,L=London,C=GB"
-//        name "O=R3cev,OU=corda,L=London,C=GB"
         advertisedServices = ["corda.notary.simple"]
         p2pPort 10002
         rpcPort 10003
-        // TODO try to remove this
-//        cordapps = ["net.corda.examples.fx:shared:1.0"]
     }
     node {
         name "O=Buyer,L=London,C=GB"
@@ -140,7 +137,6 @@ task deployNodes(type: Cordform, dependsOn: ['jar']) {
         rpcPort 10006
         cordapps = ["net.corda.examples.fx:shared:1.0", "net.corda.examples.fx:rate-provider-api:1.0", "net.corda.examples.fx:buyer-api:1.0", "net.corda.examples.fx:buyer:1.0", "net.corda:corda-finance:1.0.0"]
         rpcUsers = [[user: "user1", "password": "test", "permissions": ["ALL"]]]
-//        rpcUsers = [[user: "user1", "password": "test", "permissions": ["StartFlow.net.corda.examples.fx.buyer.BuyCurrencyFlow", "StartFlow.net.corda.examples.fx.shared.flows.IssueCashFlow", "StartFlow.net.corda.examples.fx.buyer.ExposeExchangeRateFlow"]]]
     }
     node {
         name "O=Seller,L=New York,C=US"

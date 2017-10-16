@@ -16,7 +16,7 @@ open class BuyerServer {
 
     protected fun fromJson(json: JsonObject): MoneyAmount {
 
-        return MoneyAmount(BigDecimal.valueOf(json["value"].double), Currency.getInstance(json["currency"].string))
+        return MoneyAmount(BigDecimal.valueOf(json["value"].double), parseCurrencyCode(json["currency"].string))
     }
 
     protected fun toJson(amount: MoneyAmount): JsonObject {
@@ -37,5 +37,14 @@ open class BuyerServer {
     protected fun message(text: String): String {
 
         return jsonObject("message" to text).toString()
+    }
+
+    protected fun parseCurrencyCode(it: String): Currency {
+
+        return try {
+            Currency.getInstance(it)
+        } catch (e: IllegalArgumentException) {
+            throw IllegalArgumentException("Invalid currency code $it.")
+        }
     }
 }

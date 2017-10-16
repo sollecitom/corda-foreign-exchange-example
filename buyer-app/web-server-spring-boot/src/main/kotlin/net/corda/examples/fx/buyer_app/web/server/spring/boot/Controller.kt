@@ -27,19 +27,21 @@ private class CustomerController @Autowired constructor(private val service: FXS
     fun readExchangeRate(@RequestParam("from") fromParam: String?, @RequestParam("to") toParam: String?): ResponseEntity<String> {
 
         logger.info("Received read exchange rate request.")
-
-        val from = fromParam?.let { Currency.getInstance(it) }
-        val to = toParam?.let { Currency.getInstance(it) }
-        if (from == null || to == null) {
-            return ResponseEntity.badRequest().body(message("Unspecified 'from' and 'to' currency codes query parameters."))
-        }
         return try {
+            val from = fromParam?.let(this::parseCurrencyCode)
+            val to = toParam?.let(this::parseCurrencyCode)
+            if (from == null || to == null) {
+                return ResponseEntity.badRequest().body(message("Unspecified 'from' and 'to' currency codes query parameters."))
+            }
+
             val rate = service.queryRate(from = from, to = to)
             if (rate == null) {
-                ResponseEntity.status(HttpStatus.NOT_FOUND).body(message("Not exchange rate found."))
+                ResponseEntity.status(HttpStatus.NOT_FOUND).body(message("No exchange rate found."))
             } else {
                 ResponseEntity.ok(toJson(rate, from, to).toString())
             }
+        } catch (e: IllegalArgumentException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST).body(message(e.localizedMessage))
         } catch (e: Throwable) {
             logger.error("Error while trying to retrieve exchange rate.", e)
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(message("Unknown error."))
@@ -65,10 +67,12 @@ private class CustomerController @Autowired constructor(private val service: FXS
         body ?: return ResponseEntity.badRequest().body(message("Missing mandatory request body."))
         val json = parser.parse(body) as JsonObject
         logger.info("Received cash issuance request with payload: $json")
-        val amount = fromJson(json)
         return try {
+            val amount = fromJson(json)
             service.selfIssueCash(amount)
             ResponseEntity.status(HttpStatus.CREATED).build()
+        } catch (e: IllegalArgumentException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST).body(message(e.localizedMessage))
         } catch (e: Throwable) {
             logger.error("Error while trying to self issue cash.", e)
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(message("Unknown error."))
@@ -81,15 +85,17 @@ private class CustomerController @Autowired constructor(private val service: FXS
         body ?: return ResponseEntity.badRequest().body(message("Missing mandatory request body."))
         val json = parser.parse(body) as JsonObject
         logger.info("Received cash acquisition request with payload: $json")
-        val amount = fromJson(json["amount"].asJsonObject)
-        val currency = Currency.getInstance(json["currency"].string)
         return try {
+            val amount = fromJson(json["amount"].asJsonObject)
+            val currency = parseCurrencyCode(json["currency"].string)
             val result = service.buyMoneyAmount(amount, currency)
             if (result.missingAmount == null) {
                 ResponseEntity.status(HttpStatus.CREATED).build()
             } else {
                 ResponseEntity.unprocessableEntity().body(jsonObject("message" to "Insufficient funds to buy given money amount. Missing ${result.missingAmount}.", "missing" to toJson(result.missingAmount!!)).toString())
             }
+        } catch (e: IllegalArgumentException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST).body(message(e.localizedMessage))
         } catch (e: Throwable) {
             logger.error("Error while trying to buy money.", e)
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(message("Unknown error."))

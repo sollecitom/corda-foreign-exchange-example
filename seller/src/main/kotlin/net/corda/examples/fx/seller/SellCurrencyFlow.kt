@@ -27,8 +27,6 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
 
     private companion object {
 
-        val RATE_PROVIDERS_WHITELIST = setOf(CordaX500Name(organisation = "Rate-Provider", locality = "Austin", country = "US"))
-
         val RECEIVING_PROPOSAL = object : ProgressTracker.Step("Receiving buyer's proposal") {}
         val CHECKING_PROPOSAL = object : ProgressTracker.Step("Checking buyer's proposal") {}
         val GENERATING_SPEND = object : ProgressTracker.Step("Generating spend to fulfil exchange") {}
@@ -38,6 +36,8 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
     }
 
     override val progressTracker = ProgressTracker(RECEIVING_PROPOSAL, CHECKING_PROPOSAL, GENERATING_SPEND, CONFIRMING_RATE_WITH_PROVIDER, SIGNING_TRANSACTION, SENDING_BACK_TRANSACTION)
+
+    private val rateProviderWhitelist = setOf(CordaX500Name(organisation = "Rate-Provider", locality = "Austin", country = "US"))
 
     @Suspendable
     override fun call() {
@@ -70,7 +70,7 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
         when {
             anonymisedSpendOwnerKeys.size > 1 -> transaction = anonymisedSpendOwnerKeys.slice(1 until anonymisedSpendOwnerKeys.size).fold(transaction, serviceHub::addSignature)
         }
-        val partialMerkleTree = transaction.buildFilteredTransaction(Predicate { filtering(it) })
+        val partialMerkleTree = transaction.buildFilteredTransaction(Predicate { relevantForRateProvider(it) })
         val rateProviderSignature = subFlow(SignExchangeRateFlow(transaction.tx, partialMerkleTree, rateProvider))
         return transaction.withAdditionalSignature(rateProviderSignature)
     }
@@ -101,7 +101,7 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
         require(sellAmount.token == rate.from) { "Sell amount currency does not match rate to currency!" }
 
         require(rateProvider.owningKey in signers) { "Exchange rate was not signed by rate-provider!" }
-        require(rateProvider.name in RATE_PROVIDERS_WHITELIST) { "Rate provider ${rateProvider.name} is not admissible." }
+        require(rateProvider.name in rateProviderWhitelist) { "Rate provider ${rateProvider.name} is not admissible." }
     }
 
     private fun areEqual(one: BigDecimal, other: BigDecimal): Boolean {
@@ -110,5 +110,5 @@ class SellCurrencyFlow(private val session: FlowSession) : FlowLogic<Unit>() {
     }
 
     @Suspendable
-    private fun filtering(elem: Any): Boolean = elem is Command<*> && elem.value is ExchangeUsingRate
+    private fun relevantForRateProvider(elem: Any): Boolean = elem is Command<*> && elem.value is ExchangeUsingRate
 }

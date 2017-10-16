@@ -13,13 +13,18 @@ and how to use Oracles as part of Flows.
 
 It also demonstrate how to integrate CORDA into a web application.
 
-This repository is split into four modules:
+This repository is split into seven modules:
 
-1. A shared library which holds types that all parties need to use.
-2. A buyer CorDApp, representing an entity that buys foreign currency.
-3. A buyer Spring Boot application talking to the buyer node. There are 2 web server implementations: Ktor(buyer_app:web-server-ktor) and Spring-Boot(buyer_app:web-server-spring-boot).
-4. A seller CorDApp, representing an entity that sells foreign currency.
-5. A rate provider CorDApp, representing an entity that provides currency exchange rates as an Oracle.
+1. A shared library which holds types that all parties need to use (_shared_).
+2. A buyer CorDApp, representing an entity that buys foreign currency (_buyer_).
+3. A buyer API, representing code from the buyer application visible from seller (_buyer-api_).
+4. A buyer Spring Boot application talking to the buyer node (_buyer-app_). There are 2 web server implementations: Ktor(buyer_app:web-server-ktor) and Spring-Boot(buyer_app:web-server-spring-boot).
+5. A seller CorDApp, representing an entity that sells foreign currency (_seller_).
+6. A rate provider CorDApp, representing an entity that provides currency exchange rates as an Oracle (_rate-provider_).
+7. A rate provider API, containing bindings for the buyer and the seller to call the Oracle (_rate-provider-api_).
+
+The purpose of a modular setup is to avoid having parties knowing the implementation code of other peers.
+The Spring Boot and Ktor webserver implementations are identical in behaviour and only there to demonstrate that the client can be arbitrarily chosen.
 
 ## How to run this example
 
@@ -29,7 +34,7 @@ This repository is split into four modules:
 
 ## What's available
 
-The available endpoints on localhost:8080 are:
+As for the buyer app, available driving endpoints on localhost:8080 are:
 
 - GET /cash -> returns a map currency to available cash balance. Initially empty.
 - GET /exchangeRate?from=<fromCurrencyCode>&to=<toCurrencyCode> e.g., /exchangeRate?from=GBP&to=USD -> returns the exchange rate between specified currencies, or Not Found. Response body is e.g, {"rate": 1.36, "from": "GBP", "to": "USD"}.
@@ -45,3 +50,8 @@ The available endpoints on localhost:8080 are:
 5. POST /purchases with payload {"amount": {"value": 100.0, "currency": "USD"}, "currency": "GBP"} -> no response body (201 Created).
 6. GET /cash -> {"USD":100.0,"GBP":864.0} (200 OK).
 7. As expected, the dollars have been bought and the remaining pounds £864 = £1000 - 1.36 (£/$) * $100.
+
+## Additional remarks
+
+- All currency codes are available to generate cash.
+- Only USD, EUR and GBP are available as input/output for currency exchange.
